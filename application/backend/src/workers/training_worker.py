@@ -106,7 +106,6 @@ class TrainingWorker(BaseProcessWorker):
     async def _train_model(
         self, job: Job, model: Model, snapshot: Snapshot, payload: TrainJobPayload, base_model: Model | None = None
     ):
-        settings = get_settings()
         await JobService.update_job_status(job_id=job.id, status=JobStatus.RUNNING, message="Training started")
         dispatcher = TrainingTrackingDispatcher(
             job_id=job.id,
@@ -172,10 +171,7 @@ class TrainingWorker(BaseProcessWorker):
             dispatcher.start()
             trainer.fit(model=policy, datamodule=l_dm)
 
-            for backend in settings.supported_backends:
-                export_dir = path / "exports" / backend
-                if isinstance(policy, ExportablePolicyMixin):
-                    policy.export(export_dir, backend=backend)
+            await self._export_policy(policy=policy, path=path, job=job)
 
             job = await JobService.update_job_status(
                 job_id=job.id, status=JobStatus.COMPLETED, message="Training finished"
@@ -191,3 +187,25 @@ class TrainingWorker(BaseProcessWorker):
         if dispatcher.is_alive():
             dispatcher.join(timeout=10)
         self.queue.put((EventType.JOB_UPDATE, job))
+
+    async def _export_policy(self, policy: object, path: Path, job: Job) -> None:
+        if not isinstance(policy, ExportablePolicyMixin):
+            logger.info("Skipping export: policy does not support export backends")
+            return
+
+        logger.info("Starting model export for trained policy")
+        for backend in policy.get_supported_export_backends():
+            backend_name = backend.value if hasattr(backend, "value") else str(backend)
+            try:
+                logger.info("Exporting model to {} format", backend_name)
+                await JobService.update_job_status(
+                    job_id=job.id,
+                    status=JobStatus.RUNNING,
+                    message=f"Exporting to {backend_name} format",
+                )
+                export_dir = path / "exports" / backend
+                policy.export(export_dir, backend=backend)
+                logger.info("Model export to {} completed", backend_name)
+            except Exception as e:
+                logger.error("Failed exporting model to {} format", backend_name)
+                logger.exception(e)
