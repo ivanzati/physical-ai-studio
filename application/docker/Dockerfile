@@ -53,10 +53,6 @@ COPY --link application/backend/pyproject.toml application/backend/uv.lock \
     /app/application/backend/
 COPY --link application/backend/run.sh /app/application/backend/run.sh
 
-# physicalai hardware package (local path dependency)
-# TODO(#450): Remove once physicalai is published from its own repo.
-COPY --link --from=pai . /app/physicalai/
-
 # Built UI assets
 COPY --link --from=web-ui /home/app/web_ui/dist /app/application/ui/
 
@@ -100,8 +96,6 @@ WORKDIR /app
 # The real library source is overlaid via app-source in the final image.
 COPY --link pyproject.toml uv.lock ./
 COPY --link --from=libs ./pyproject.toml /app/library/pyproject.toml
-# TODO(#450): Remove once physicalai is published from its own repo.
-COPY --link --from=pai ./pyproject.toml /app/physicalai/pyproject.toml
 
 # Backend manifests only (not src/ or run.sh) — sufficient for dep resolution.
 COPY --link application/backend/pyproject.toml application/backend/uv.lock \
@@ -125,7 +119,6 @@ FROM builder-base AS builder-cpu
 
 RUN --mount=type=cache,id=uv-cpu,target=/root/.cache/uv \
     --mount=type=bind,from=libs,target=/app/library \
-    --mount=type=bind,from=pai,target=/app/physicalai \
     uv sync --frozen --no-dev --no-editable --extra cpu
 
 # ===========================================================================
@@ -135,7 +128,6 @@ FROM builder-base AS builder-xpu
 
 RUN --mount=type=cache,id=uv-xpu,target=/root/.cache/uv \
     --mount=type=bind,from=libs,target=/app/library \
-    --mount=type=bind,from=pai,target=/app/physicalai \
     uv sync --frozen --no-dev --no-editable --extra xpu
 
 # ===========================================================================
@@ -145,7 +137,6 @@ FROM builder-base AS builder-cuda
 
 RUN --mount=type=cache,id=uv-cuda,target=/root/.cache/uv \
     --mount=type=bind,from=libs,target=/app/library \
-    --mount=type=bind,from=pai,target=/app/physicalai \
     uv sync --frozen --no-dev --no-editable --extra cuda
 
 # ===========================================================================
