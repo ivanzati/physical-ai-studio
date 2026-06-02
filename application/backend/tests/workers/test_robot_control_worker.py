@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from tests.queue_utils import clear_queue, thread_flush, wait_until_message_from_queue
+from tests.queue_utils import clear_queue, wait_until_message_from_queue
 
 from control.environment_integration import EnvironmentIntegration
 from control.sync_mixed_model_integration import SyncMixedModelIntegration
@@ -144,11 +144,10 @@ def loaded_teleoperation_worker(
     environment_integration.allow_setup()
     with patch("workers.robot_control_worker.InternalLeRobotDataset", return_value=test_dataset_impl):
         robot_control_worker.load_dataset(test_dataset)
-    thread_flush()
-    clear_queue(robot_control_worker.queue)
-    state = wait_until_message_from_queue(robot_control_worker.queue, "state")["data"]
+    state = _wait_until_state(robot_control_worker.queue, environment_loaded=True, dataset_loaded=True)
     assert state["environment_loaded"]
     assert state["dataset_loaded"]
+    clear_queue(robot_control_worker.queue)
 
     return robot_control_worker
 

@@ -2,7 +2,7 @@
 name = "physical-ai-studio"
 version = "1.0.0"
 description = "Physical AI Studio server"
-requires-python = ">=3.12,<3.15"
+requires-python = ">=3.12,<3.14"
 
 dependencies = [
   "opencv-python",
@@ -193,12 +193,12 @@ max-args = 7
 # MYPY CONFIGURATION                                                           #
 # ============================================================================ #
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.13"
 ignore_missing_imports = true
 show_error_codes = true
 
 [tool.pyrefly]
-python-version = "3.12"
+python-version = "3.13"
 search-path = ["src"]
 project-includes = ["src"]
 project-excludes = [
