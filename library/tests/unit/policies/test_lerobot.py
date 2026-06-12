@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import pathlib
 import tempfile
+from dataclasses import dataclass
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 import torch
@@ -333,7 +335,6 @@ class TestNamedLeRobotPolicy:
 
         with pytest.raises(ValueError, match="refusing to override"):
             wrapper_cls(policy_name=wrong_name)
-
 
 class TestLeRobotPolicyCheckpoint:
     """Tests for checkpoint save and load functionality."""
