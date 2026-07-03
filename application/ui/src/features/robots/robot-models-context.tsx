@@ -122,7 +122,7 @@ const loadURDFModel = async (path: string): Promise<URDFRobot> => {
     const loader = new URDFLoader(manager);
 
     loader.packages = {
-        trossen_arm_description: '/widowx',
+        trossen_arm_description: '/api/robots/catalog/Trossen_WidowXAI_Leader',
     };
 
     return new Promise<URDFRobot>((resolve, reject) => {

@@ -4,20 +4,7 @@
 ARG PYTHON_VERSION=3.13
 
 # ===========================================================================
-# Stage 1: Clone Geti UI packages and URDF robot models
-# ===========================================================================
-FROM node:24-alpine3.22@sha256:191c9f0080fcbbc6547a85dc0ff7988072214a355aabdc1d2ec55a7dae5eea8a AS ui-packages
-
-WORKDIR /home/app/web_ui/
-RUN apk add --no-cache git
-COPY --link ./application/ui/package.json ./
-
-# Clone URDF files
-RUN npm run clone-so101
-RUN npm run clone-widowx
-
-# ===========================================================================
-# Stage 2: Build Web UI
+# Stage 1: Build Web UI
 # ===========================================================================
 FROM node:24-alpine3.22@sha256:191c9f0080fcbbc6547a85dc0ff7988072214a355aabdc1d2ec55a7dae5eea8a AS web-ui
 
@@ -25,7 +12,6 @@ WORKDIR /home/app/web_ui/
 
 COPY --link application/ui/package.json ./
 COPY --link application/ui/package-lock.json ./
-COPY --from=ui-packages /home/app/web_ui/public/ /home/app/web_ui/public/
 RUN npm ci --audit=false --ignore-scripts
 
 COPY --link application/ui/tsconfig.base.json ./
@@ -53,6 +39,7 @@ COPY --link application/README.md /app/application/README.md
 
 # Backend source, entrypoint, manifests, and build hook
 COPY --link application/backend/src /app/application/backend/src
+COPY --link application/backend/scripts /app/application/backend/scripts
 COPY --link application/backend/pyproject.toml application/backend/uv.lock \
     /app/application/backend/
 COPY --link application/backend/README.md /app/application/backend/README.md
@@ -160,7 +147,7 @@ RUN uv pip uninstall --python .venv/bin/python \
     pytest-rerunfailures \
     expecttest hypothesis sortedcontainers kgb parameterized
 
-# Remove redundant for XPU container image Triton GPU backends (NVIDIA and AMD) 
+# Remove redundant for XPU container image Triton GPU backends (NVIDIA and AMD)
 # that also contains non-redistributable files
 # Based on: https://docs.nvidia.com/cuda/eula/index.html
 RUN set -eu; \
@@ -213,6 +200,7 @@ RUN groupadd --gid "${APP_GID}" appuser \
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         ffmpeg \
+        git \
         libgl1 \
         libglib2.0-0 \
         libusb-1.0-0 \
@@ -268,6 +256,7 @@ RUN uv pip install --python /app/application/backend/.venv/bin/python --no-deps 
 
 WORKDIR /app/application/backend
 USER appuser
+RUN physicalai-studio sync-robot-assets
 CMD ["./run.sh"]
 
 # ===========================================================================
@@ -321,6 +310,7 @@ RUN uv pip install --python /app/application/backend/.venv/bin/python --no-deps 
 
 WORKDIR /app/application/backend
 USER appuser
+RUN physicalai-studio sync-robot-assets
 CMD ["./run.sh"]
 
 # ===========================================================================
@@ -393,4 +383,5 @@ RUN uv pip install --python /app/application/backend/.venv/bin/python --no-deps 
 
 WORKDIR /app/application/backend
 USER appuser
+RUN physicalai-studio sync-robot-assets
 CMD ["./run.sh"]
