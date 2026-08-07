@@ -73,7 +73,7 @@ jobs:
     name: Build (${{ matrix.device }})
     needs: check-paths
     if: needs.check-paths.outputs.run_workflow == 'true'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read # Checkout code
       packages: write # Push/pull registry build cache on GHCR
@@ -82,7 +82,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        device: [cpu, xpu, cuda]
+        include:
+          # CPU and XPU build on GitHub-hosted runners
+          - device: cpu
+            runner: ubuntu-latest
+          - device: xpu
+            runner: ubuntu-latest
+          # CUDA needs GPU hardware for the smoke test
+          - device: cuda
+            # TODO: Forked repo has no access to self-hosted runners
+            # runner: [self-hosted, linux, x64]
+            runner: ubuntu-24.04
 
     steps:
       - *harden-runner
@@ -100,7 +110,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
-          images: ghcr.io/open-edge-platform/physical-ai-studio-${{ matrix.device }}
+          images: ghcr.io/ivanzati/physical-ai-studio-${{ matrix.device }}
           tags: |
             type=sha
             type=ref,event=pr
@@ -134,7 +144,7 @@ jobs:
 
             # Extract registry and tag from the built image name
             # IMAGE format: registry/org/name:tag
-            # Example: ghcr.io/open-edge-platform/physical-ai-studio-cpu:sha-abc123
+            # Example: ghcr.io/ivanzati/physical-ai-studio-cpu:sha-abc123
             REGISTRY=$(echo "${IMAGE}" | sed 's|\(.*\)/[^/]*$|\1/|')
             IMAGE_TAG=$(echo "${IMAGE}" | sed 's|.*:||')
 
