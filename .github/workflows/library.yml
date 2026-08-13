@@ -168,7 +168,7 @@ jobs:
           # libosmesa6 ships libOSMesa.so.8, which mujoco's osmesa backend loads
           # via PyOpenGL. This is the ONLY hard dependency; we avoid libgl1-mesa-glx
           # (removed on Ubuntu 24.04) so the install can't break across runner OSes.
-          sudo apt-get install -y libosmesa6 libosmesa6-dev
+          sudo apt-get install -y libosmesa6 libosmesa6-dev libavutil-dev libavcodec-dev libavformat-dev
 
       - name: GPU / EGL preflight diagnostics
         continue-on-error: true
@@ -311,8 +311,7 @@ jobs:
         working-directory: library
         run: |
           source .venv-robocasa/bin/activate
-          yes y | python -m robocasa.scripts.download_kitchen_assets \
-            --type tex tex_generative fixtures_lw objs_lw
+          yes y | python -m robocasa.scripts.download_kitchen_assets --type tex tex_generative fixtures_lw objs_lw
 
       - name: Run RoboCasa integration test
         working-directory: library
