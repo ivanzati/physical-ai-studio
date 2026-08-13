@@ -145,7 +145,10 @@ jobs:
           uv run --no-sync pytest tests/unit
 
   integration-tests:
-    runs-on: [self-hosted, Linux, X64, gpu]
+    # open-edge-platform uses a self-hosted GPU runner; forks fall back to
+    # GitHub-hosted. Rendering uses OSMesa (CPU software GL), so no GPU is
+    # required on the fallback runner.
+    runs-on: ${{ github.repository_owner == 'open-edge-platform' && fromJSON('["self-hosted", "Linux", "X64", "gpu"]') || 'ubuntu-latest' }}
     needs: check-paths
     if: needs.check-paths.outputs.run_workflow == 'true'
     permissions:
@@ -222,7 +225,10 @@ jobs:
           uv run --no-sync pytest tests/integration -m "not slow"
 
   integration-tests-robocasa:
-    runs-on: [self-hosted, Linux, X64, gpu]
+    # open-edge-platform uses a self-hosted GPU runner; forks fall back to
+    # GitHub-hosted. Rendering uses OSMesa (CPU software GL), so no GPU is
+    # required on the fallback runner.
+    runs-on: ${{ github.repository_owner == 'open-edge-platform' && fromJSON('["self-hosted", "Linux", "X64", "gpu"]') || 'ubuntu-latest' }}
     needs: check-paths
     if: needs.check-paths.outputs.run_workflow == 'true'
     permissions:
