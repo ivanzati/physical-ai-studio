@@ -78,7 +78,7 @@ jobs:
     name: Build (${{ matrix.device }})
     needs: check-paths
     if: needs.check-paths.outputs.run_workflow == 'true'
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ fromJSON(matrix.runner) }}
     permissions:
       contents: read # Checkout code
       packages: write # Push/pull registry build cache on GHCR
@@ -88,14 +88,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # CPU and XPU build on GitHub-hosted runners
+          # CPU and XPU always build on GitHub-hosted runners.
           - device: cpu
-            runner: [ubuntu-latest]
+            runner: '["ubuntu-latest"]'
           - device: xpu
-            runner: [ubuntu-latest]
-          # CUDA needs GPU hardware for the smoke test
+            runner: '["ubuntu-latest"]'
+          # CUDA runs on the open-edge-platform self-hosted runner; forks (which
+          # have no self-hosted runners) fall back to GitHub-hosted. The smoke
+          # test runs the image CPU-only (no --gpus passthrough), so it needs no
+          # GPU hardware on the fallback runner.
           - device: cuda
-            runner: [self-hosted, linux, x64]
+            runner: ${{ github.repository_owner == 'open-edge-platform' && '["self-hosted", "linux", "x64"]' || '["ubuntu-latest"]' }}
 
     steps:
       - *harden-runner
@@ -113,7 +116,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
-          images: ghcr.io/open-edge-platform/physical-ai-studio-${{ matrix.device }}
+          images: ghcr.io/${{ github.repository_owner }}/physical-ai-studio-${{ matrix.device }}
           tags: |
             type=sha
             type=ref,event=pr
@@ -125,9 +128,11 @@ jobs:
           device: ${{ matrix.device }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Fork PRs cannot write packages to the upstream org, so disable
-          # cache export to avoid 403 errors from GHCR.
-          cache-write: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          # PR builds are cache-read-only: the buildcache is kept authoritative
+          # from `main` by docker-cache-warm.yml. This stops concurrent PRs from
+          # overwriting each other's shared buildcache (which caused frequent
+          # layer misses and multi-GB dependency re-downloads).
+          cache-write: "false"
 
       - name: Smoke-test docker image
         env:

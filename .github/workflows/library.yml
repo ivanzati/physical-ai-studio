@@ -121,7 +121,7 @@ jobs:
       - name: Install system dependencies for headless rendering
         run: |
           sudo apt-get update
-          sudo apt-get install -y libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev
+          sudo apt-get install -y libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libosmesa6 libosmesa6-dev libavutil-dev libavcodec-dev libavformat-dev
 
       - *set-up-uv
 
@@ -145,7 +145,10 @@ jobs:
           uv run --no-sync pytest tests/unit
 
   integration-tests:
-    runs-on: [self-hosted, Linux, X64, gpu]
+    # open-edge-platform uses a self-hosted GPU runner; forks fall back to
+    # GitHub-hosted. Rendering uses OSMesa (CPU software GL), so no GPU is
+    # required on the fallback runner.
+    runs-on: ${{ github.repository_owner == 'open-edge-platform' && fromJSON('["self-hosted", "Linux", "X64", "gpu"]') || 'ubuntu-latest' }}
     needs: check-paths
     if: needs.check-paths.outputs.run_workflow == 'true'
     permissions:
@@ -165,7 +168,7 @@ jobs:
           # libosmesa6 ships libOSMesa.so.8, which mujoco's osmesa backend loads
           # via PyOpenGL. This is the ONLY hard dependency; we avoid libgl1-mesa-glx
           # (removed on Ubuntu 24.04) so the install can't break across runner OSes.
-          sudo apt-get install -y libosmesa6 libosmesa6-dev
+          sudo apt-get install -y ffmpeg libosmesa6 libosmesa6-dev libavutil-dev libavcodec-dev libavformat-dev
 
       - name: GPU / EGL preflight diagnostics
         continue-on-error: true
@@ -222,7 +225,10 @@ jobs:
           uv run --no-sync pytest tests/integration -m "not slow"
 
   integration-tests-robocasa:
-    runs-on: [self-hosted, Linux, X64, gpu]
+    # open-edge-platform uses a self-hosted GPU runner; forks fall back to
+    # GitHub-hosted. Rendering uses OSMesa (CPU software GL), so no GPU is
+    # required on the fallback runner.
+    runs-on: ${{ github.repository_owner == 'open-edge-platform' && fromJSON('["self-hosted", "Linux", "X64", "gpu"]') || 'ubuntu-latest' }}
     needs: check-paths
     if: needs.check-paths.outputs.run_workflow == 'true'
     permissions:
@@ -242,7 +248,7 @@ jobs:
           # libosmesa6 ships libOSMesa.so.8, which mujoco's osmesa backend loads
           # via PyOpenGL. This is the ONLY hard dependency; we avoid libgl1-mesa-glx
           # (removed on Ubuntu 24.04) so the install can't break across runner OSes.
-          sudo apt-get install -y libosmesa6 libosmesa6-dev
+          sudo apt-get install -y libosmesa6 libosmesa6-dev libavutil-dev libavcodec-dev libavformat-dev
 
       - name: GPU / EGL preflight diagnostics
         continue-on-error: true
