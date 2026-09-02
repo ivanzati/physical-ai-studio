@@ -1,0 +1,142 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Deploys a GPU-accelerated EC2 instance with an automatically managed SSH key pair.
+  Uses the AWS Deep Learning Base OSS NVIDIA Driver GPU AMI (Ubuntu 22.04), which ships
+  with the NVIDIA driver, CUDA, Docker and the NVIDIA Container Toolkit preinstalled.
+  Default SSH user is 'ubuntu'.
+  NOTE: safe to deploy multiple times/concurrently; use a unique stack name per machine
+  (all named resources are scoped to ${AWS::StackName}).
+
+Parameters:
+  InstanceType:
+    Description: 'EC2 GPU instance type.'
+    Type: String
+    Default: 'g4dn.xlarge'
+    AllowedValues:
+      - 'g4dn.xlarge'
+      - 'g4dn.2xlarge'
+      - 'g5.xlarge'
+      - 'p3.2xlarge'
+
+  LatestDeepLearningAMI:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/deeplearning/ami/x86_64/base-oss-nvidia-driver-gpu-ubuntu-22.04/latest/ami-id'
+    Description: 'Latest Deep Learning Base OSS NVIDIA Driver GPU AMI (Ubuntu 22.04, x86_64). SSH user is ubuntu; NVIDIA driver, CUDA and Docker preinstalled.'
+
+  VpcId:
+    Type: 'AWS::EC2::VPC::Id'
+    Description: 'VPC for the security group. Must be the same VPC that contains SubnetId.'
+
+  SubnetId:
+    Type: 'AWS::EC2::Subnet::Id'
+    Description: 'The VPC subnet to launch the GPU instance into.'
+
+Resources:
+  # 1. Automatically generate the SSH Key Pair
+  SSHKeyPair:
+    Type: 'AWS::EC2::KeyPair'
+    Properties:
+      KeyName: !Sub '${AWS::StackName}-ssh-key'
+
+  # 2. Configure Firewall/Security Group for SSH Access
+  GPUSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Allow SSH traffic into the GPU machine'
+      VpcId: !Ref VpcId
+      # SSH restricted to Intel-owned network ranges (intel_network_cidrs)
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: '134.134.139.64/27', Description: 'Intel Americas' }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: '134.134.137.64/27', Description: 'Intel Americas' }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: '192.55.54.32/27', Description: 'Intel Americas' }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: '192.55.55.32/27', Description: 'Intel Americas' }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: '192.198.151.32/27', Description: 'Intel Europe' }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: '134.191.196.160/27', Description: 'Intel Europe' }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: '134.191.197.160/27', Description: 'Intel Europe' }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: '134.191.227.32/27', Description: 'Intel Europe' }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: '134.191.220.64/27', Description: 'Intel Europe' }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: '134.191.221.64/27', Description: 'Intel Europe' }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: '134.191.232.64/27', Description: 'Intel Middle East' }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: '134.191.233.192/27', Description: 'Intel Middle East' }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: '192.55.79.160/27', Description: 'Intel Asia' }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: '198.175.68.32/27', Description: 'Intel Asia' }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: '192.198.146.160/27', Description: 'Intel Asia' }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: '192.198.147.160/27', Description: 'Intel Asia' }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: '192.102.204.32/27', Description: 'Intel Asia' }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: '192.55.46.32/27', Description: 'Intel Asia' }
+
+  # 3. Spin up the GPU Instance
+  GPUInstance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref LatestDeepLearningAMI
+      KeyName: !Ref SSHKeyPair
+      # Enforce IMDSv2 (token-required) to mitigate SSRF-based credential theft
+      MetadataOptions:
+        HttpTokens: required
+        HttpEndpoint: enabled
+      # DLAMI already ships NVIDIA driver + CUDA + Docker; just smoke-test the GPU and signal WaitCondition.
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          HANDLE="${WaitHandle}"
+          # -H 'Content-Type:' omits the header so it matches the presigned URL signature; --fail-with-body makes HTTP 4xx/5xx a non-zero exit
+          trap 'curl -sS --fail-with-body -X PUT -H "Content-Type:" --data-binary "{\"Status\":\"FAILURE\",\"UniqueId\":\"gpu-setup\",\"Reason\":\"UserData failed; see /var/log/cloud-init-output.log\",\"Data\":\"error\"}" "$HANDLE" || true' ERR
+          # Wait for the NVIDIA driver to be ready (persistence can lag first boot), then verify.
+          for i in $(seq 1 30); do nvidia-smi && break || sleep 10; done
+          nvidia-smi
+          systemctl enable --now docker
+          usermod -aG docker ubuntu
+          curl -sS --fail-with-body -X PUT -H "Content-Type:" --data-binary "{\"Status\":\"SUCCESS\",\"UniqueId\":\"gpu-setup\",\"Reason\":\"GPU ready: NVIDIA driver, CUDA and Docker verified\",\"Data\":\"ok\"}" "$HANDLE"
+      BlockDeviceMappings:
+        # Ubuntu DLAMI root device; enlarged for models, datasets and container images.
+        # Throughput left at the gp3 default (125 MiB/s): CFN early validation rejects an explicit Throughput here.
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 120
+            VolumeType: gp3
+            Iops: 3000
+            DeleteOnTermination: true
+            Encrypted: true
+      NetworkInterfaces:
+        - DeviceIndex: 0
+          SubnetId: !Ref SubnetId
+          AssociatePublicIpAddress: true
+          GroupSet:
+            - !Ref GPUSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-GPU-Machine'
+
+  # 4. Wait until the instance has verified the GPU is ready
+  WaitHandle:
+    Type: 'AWS::CloudFormation::WaitConditionHandle'
+
+  WaitCondition:
+    Type: 'AWS::CloudFormation::WaitCondition'
+    DependsOn: GPUInstance
+    Properties:
+      Handle: !Ref WaitHandle
+      Timeout: '900' # 15 min; drivers are preinstalled, only a smoke test runs
+      Count: 1
+
+Outputs:
+  InstancePublicIP:
+    Description: 'Public IP of your GPU instance'
+    Value: !GetAtt GPUInstance.PublicIp
+
+  SSHKeyParameterStorePath:
+    Description: 'SSM Parameter Store path where your private key is saved'
+    Value: !Sub '/ec2/keypair/${SSHKeyPair.KeyPairId}'
+
+  SSHCommand:
+    Description: 'Fetch the private key from SSM Parameter Store, restrict its permissions, then connect.'
+    Value: !Sub >-
+      aws ssm get-parameter
+      --name /ec2/keypair/${SSHKeyPair.KeyPairId}
+      --with-decryption --query Parameter.Value --output text
+      > ${AWS::StackName}-key.pem
+      && chmod 600 ${AWS::StackName}-key.pem
+      && ssh -i ${AWS::StackName}-key.pem ubuntu@${GPUInstance.PublicIp}
