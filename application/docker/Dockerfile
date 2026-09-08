@@ -137,6 +137,17 @@ RUN uv pip uninstall --python .venv/bin/python \
     pytest-rerunfailures \
     expecttest hypothesis sortedcontainers kgb parameterized
 
+# Remove redundant for CPU container image Triton GPU backends (NVIDIA and AMD)
+# that also contains non-redistributable files
+# Based on: https://docs.nvidia.com/cuda/eula/index.html
+RUN set -eu; \
+    CLEANUP_ROOT="$(.venv/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"; \
+    [ -n "$CLEANUP_ROOT" ] && [ -d "$CLEANUP_ROOT" ]; \
+    find "$CLEANUP_ROOT" -type d -path "*/triton/backends/nvidia" \
+        -exec rm -rf {} + 2>/dev/null || true; \
+    find "$CLEANUP_ROOT" -type d -path "*/triton/backends/amd" \
+        -exec rm -rf {} + 2>/dev/null || true
+
 # ===========================================================================
 # Stage 4b: XPU builder
 # ===========================================================================
@@ -183,6 +194,21 @@ RUN uv pip uninstall --python .venv/bin/python \
     pytest-json-report pytest-metadata \
     pytest-rerunfailures \
     expecttest hypothesis sortedcontainers kgb parameterized
+
+# Remove the redundant AMD Triton backend (unused on NVIDIA hardware, ships
+# non-redistributable files) and the non-redistributable NVIDIA CUDA developer
+# tools that torch.compile does not need at runtime (cuobjdump, nvdisasm).
+# ptxas is kept because Triton requires it to compile GPU kernels.
+# Based on: https://docs.nvidia.com/cuda/eula/index.html
+RUN set -eu; \
+    CLEANUP_ROOT="$(.venv/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"; \
+    [ -n "$CLEANUP_ROOT" ] && [ -d "$CLEANUP_ROOT" ]; \
+    find "$CLEANUP_ROOT" -type d -path "*/triton/backends/amd" \
+        -exec rm -rf {} + 2>/dev/null || true; \
+    find "$CLEANUP_ROOT" -type f -path "*/triton/backends/nvidia/bin/cuobjdump" \
+        -delete 2>/dev/null || true; \
+    find "$CLEANUP_ROOT" -type f -path "*/triton/backends/nvidia/bin/nvdisasm" \
+        -delete 2>/dev/null || true
 
 # ===========================================================================
 # Stage 4d: Robot assets builder
