@@ -77,16 +77,16 @@ jobs:
 
       - name: Set build matrix
         id: set_matrix
-        # Fork PRs cannot schedule jobs on the org's self-hosted GPU runners.
-        # Build CUDA there on ubuntu-latest, but keep GPU smoke tests upstream.
+        # Only same-repo PRs in upstream can use the self-hosted GPU runner.
+        # Fork paths build CUDA on ubuntu-latest without a GPU smoke test.
         env:
-          IS_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+          CAN_USE_SELF_HOSTED_CUDA: ${{ github.repository_owner == 'open-edge-platform' && github.event.pull_request.head.repo.full_name == github.repository }}
         run: |
           CPU_XPU='{"device":"cpu","runner":["ubuntu-latest"]},{"device":"xpu","runner":["ubuntu-latest"]}'
-          if [ "${IS_FORK}" = "true" ]; then
-            MATRIX="{\"include\":[${CPU_XPU},{\"device\":\"cuda\",\"runner\":[\"ubuntu-latest\"]}]}"
-          else
+          if [ "${CAN_USE_SELF_HOSTED_CUDA}" = "true" ]; then
             MATRIX="{\"include\":[${CPU_XPU},{\"device\":\"cuda\",\"runner\":[\"self-hosted\",\"linux\",\"x64\"]}]}"
+          else
+            MATRIX="{\"include\":[${CPU_XPU},{\"device\":\"cuda\",\"runner\":[\"ubuntu-latest\"]}]}"
           fi
           echo "matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
 
@@ -140,7 +140,7 @@ jobs:
           cache-write: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
 
       - name: Smoke-test docker image
-        if: matrix.device != 'cuda' || github.event.pull_request.head.repo.full_name == github.repository
+        if: matrix.device != 'cuda' || (github.repository_owner == 'open-edge-platform' && github.event.pull_request.head.repo.full_name == github.repository)
         env:
           IMAGE: ${{ steps.docker_build.outputs.image-name }}
           DEVICE: ${{ matrix.device }}
