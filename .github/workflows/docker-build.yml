@@ -77,14 +77,14 @@ jobs:
 
       - name: Set build matrix
         id: set_matrix
-        # Fork PRs cannot schedule jobs on the org's self-hosted GPU runners,
-        # so the CUDA target is dropped for them and only cpu/xpu are built.
+        # Fork PRs cannot schedule jobs on the org's self-hosted GPU runners.
+        # Build CUDA there on ubuntu-latest, but keep GPU smoke tests upstream.
         env:
           IS_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
         run: |
           CPU_XPU='{"device":"cpu","runner":["ubuntu-latest"]},{"device":"xpu","runner":["ubuntu-latest"]}'
           if [ "${IS_FORK}" = "true" ]; then
-            MATRIX="{\"include\":[${CPU_XPU}]}"
+            MATRIX="{\"include\":[${CPU_XPU},{\"device\":\"cuda\",\"runner\":[\"ubuntu-latest\"]}]}"
           else
             MATRIX="{\"include\":[${CPU_XPU},{\"device\":\"cuda\",\"runner\":[\"self-hosted\",\"linux\",\"x64\"]}]}"
           fi
@@ -140,6 +140,7 @@ jobs:
           cache-write: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
 
       - name: Smoke-test docker image
+        if: matrix.device != 'cuda' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           IMAGE: ${{ steps.docker_build.outputs.image-name }}
           DEVICE: ${{ matrix.device }}
@@ -276,7 +277,7 @@ jobs:
           echo "human=${SIZE_MB} MB (${SIZE_GB} GB)" >> "$GITHUB_OUTPUT"
 
       - name: Post image size comment
-        # Skip this step for PRs from forks as the do not have write permissions
+        # Skip this step for PRs from forks as they do not have write permissions
         if: github.event.pull_request.head.repo.full_name == github.repository
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
