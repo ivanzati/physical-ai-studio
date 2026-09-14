@@ -386,7 +386,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
         -o /tmp/cuda-keyring.deb \
     && dpkg -i /tmp/cuda-keyring.deb \
     && rm -f /tmp/cuda-keyring.deb \
-    && apt-get update && apt-get install -y --no-install-recommends \
+    && apt-get update -o APT::Key::GPGVCommand=/usr/bin/gpgv && apt-get install -y --no-install-recommends \
         cuda-cudart-12-8=12.8.90-1 \
         libcublas-12-8=12.8.4.1-1 \
         libcudnn9-cuda-12=9.19.0.56-1 \
