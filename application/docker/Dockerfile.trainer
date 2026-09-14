@@ -198,6 +198,7 @@ RUN groupadd --gid "${TRAINER_GID}" trainer \
         g++ \
         libgl1 \
         libglib2.0-0 \
+        libvpl2 \
         libva2 \
         libva-drm2 \
         libvpx9 \
@@ -266,7 +267,6 @@ RUN apt-get update \
         intel-metrics-discovery \
         intel-ocloc \
         intel-opencl-icd \
-        libmfx-gen1 \
         libvpl2 \
         libze-dev \
         libze-intel-gpu1 \
