@@ -395,7 +395,7 @@ COPY --link --from=ffmpeg-builder /opt/ffmpeg-vpl /opt/ffmpeg-vpl
 COPY --link --from=ffmpeg-builder /usr/local/lib/libSvtAv1* /usr/local/lib/
 COPY --link --from=ffmpeg-builder /usr/local/lib/libopenh264* /usr/local/lib/
 RUN set -eux; \
-    svtav1_lib="$(find /usr/local/lib -maxdepth 1 -type f -name 'libSvtAv1Enc.so.*' -printf '%f\n' | sort | head -n1)"; \
+    svtav1_lib="$(find /usr/local/lib -maxdepth 1 -type f -name 'libSvtAv1Enc.so.*' -printf '%f\n' | sort -V | tail -n1)"; \
     test -n "$svtav1_lib"; \
     ln -sf "$svtav1_lib" /usr/local/lib/libSvtAv1Enc.so; \
     ln -sf libopenh264.so.2.6.0 /usr/local/lib/libopenh264.so.8; \
