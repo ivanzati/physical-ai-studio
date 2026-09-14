@@ -394,13 +394,7 @@ COPY --link --from=ffmpeg-builder /opt/vpl /opt/vpl
 COPY --link --from=ffmpeg-builder /opt/ffmpeg-vpl /opt/ffmpeg-vpl
 COPY --link --from=ffmpeg-builder /usr/local/lib/libSvtAv1* /usr/local/lib/
 COPY --link --from=ffmpeg-builder /usr/local/lib/libopenh264* /usr/local/lib/
-RUN set -eux; \
-    svtav1_lib="$(find /usr/local/lib -maxdepth 1 -type f -name 'libSvtAv1Enc.so.*' -printf '%f\n' | sort -V | tail -n1)"; \
-    test -n "$svtav1_lib"; \
-    ln -sf "$svtav1_lib" /usr/local/lib/libSvtAv1Enc.so; \
-    ln -sf libopenh264.so.2.6.0 /usr/local/lib/libopenh264.so.8; \
-    ln -sf libopenh264.so.8 /usr/local/lib/libopenh264.so; \
-    ldconfig
+RUN ldconfig -n /usr/local/lib && ldconfig
 
 ENV LD_LIBRARY_PATH="/opt/vpl/lib:/opt/vpl/lib64:/opt/ffmpeg-vpl/lib:/usr/local/lib" \
     PATH="/opt/ffmpeg-vpl/bin:/app/application/backend/.venv/bin:$PATH"
