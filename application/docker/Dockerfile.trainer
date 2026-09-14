@@ -214,15 +214,9 @@ COPY --link --from=ffmpeg-builder /opt/ffmpeg-vpl /opt/ffmpeg-vpl
 COPY --link --from=ffmpeg-builder /usr/local/lib/libSvtAv1* /usr/local/lib/
 COPY --link --from=ffmpeg-builder /usr/local/lib/libopenh264* /usr/local/lib/
 RUN set -eux; \
-    for lib in /usr/local/lib/libopenh264.so.* /usr/local/lib/libSvtAv1Enc.so.*; do \
-        [ -f "$lib" ] || continue; \
-        soname="$(readelf -d "$lib" | awk -F'[][]' '/SONAME/ { print $2; exit }')"; \
-        [ -n "$soname" ]; \
-        if [ "$(basename "$lib")" != "$soname" ]; then \
-            ln -sf "$(basename "$lib")" "/usr/local/lib/$soname"; \
-        fi; \
-        ln -sf "$soname" "/usr/local/lib/${soname%%.so*}.so"; \
-    done; \
+    ln -sf libSvtAv1Enc.so.4 /usr/local/lib/libSvtAv1Enc.so; \
+    ln -sf libopenh264.so.2.6.0 /usr/local/lib/libopenh264.so.8; \
+    ln -sf libopenh264.so.8 /usr/local/lib/libopenh264.so; \
     ldconfig
 
 ENV LD_LIBRARY_PATH="/opt/vpl/lib:/opt/vpl/lib64:/opt/ffmpeg-vpl/lib:/usr/local/lib" \
