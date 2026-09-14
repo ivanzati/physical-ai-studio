@@ -383,7 +383,9 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN echo "deb [arch=amd64 trusted=yes] https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64 /" \
         > /etc/apt/sources.list.d/nvidia-cuda.list \
     && apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
-    && curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/cuda-keyring_1.1-1_all.deb -o /tmp/cuda-keyring.deb \
+    && curl -fsSL \
+        https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/cuda-keyring_1.1-1_all.deb \
+        -o /tmp/cuda-keyring.deb \
     && dpkg -i /tmp/cuda-keyring.deb \
     && rm -f /tmp/cuda-keyring.deb \
     && apt-get update && apt-get install -y --no-install-recommends \
@@ -391,7 +393,6 @@ RUN echo "deb [arch=amd64 trusted=yes] https://developer.download.nvidia.com/com
         libcublas-12-8=12.8.4.1-1 \
         libcudnn9-cuda-12=9.19.0.56-1 \
     && rm -rf /var/lib/apt/lists/*
-
 SHELL ["/bin/sh", "-c"]
 
 # ---------------------------------------------------------------------------
