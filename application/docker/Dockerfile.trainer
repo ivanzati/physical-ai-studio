@@ -267,7 +267,6 @@ RUN apt-get update \
         intel-metrics-discovery \
         intel-ocloc \
         intel-opencl-icd \
-        libvpl2 \
         libze-dev \
         libze-intel-gpu1 \
         libze1 \

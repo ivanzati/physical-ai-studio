@@ -456,7 +456,6 @@ RUN echo "deb [arch=amd64 trusted=yes] https://ppa.launchpadcontent.net/kobuk-te
         clinfo \
         intel-media-va-driver-non-free \
         libmfx-gen1 \
-        libvpl2 \
         libvpl-tools \
         libva-glx2 \
         va-driver-all \
