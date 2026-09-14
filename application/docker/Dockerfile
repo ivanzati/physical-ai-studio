@@ -392,9 +392,10 @@ ENV PATH="/app/application/backend/.venv/bin:$PATH" \
 # Custom LGPL FFmpeg + oneVPL shared libraries and the LGPL FFmpeg CLI binary.
 COPY --link --from=ffmpeg-builder /opt/vpl /opt/vpl
 COPY --link --from=ffmpeg-builder /opt/ffmpeg-vpl /opt/ffmpeg-vpl
-COPY --link --from=ffmpeg-builder /usr/local/lib/libSvtAv1* /usr/local/lib/
-COPY --link --from=ffmpeg-builder /usr/local/lib/libopenh264* /usr/local/lib/
-RUN ldconfig -n /usr/local/lib && ldconfig
+RUN --mount=type=bind,from=ffmpeg-builder,source=/usr/local/lib,target=/tmp/ffmpeg-builder-lib,ro \
+    cp -a /tmp/ffmpeg-builder-lib/libSvtAv1Enc.so* /tmp/ffmpeg-builder-lib/libopenh264.so* /usr/local/lib/ \
+    && ldconfig -n /usr/local/lib \
+    && ldconfig
 
 ENV LD_LIBRARY_PATH="/opt/vpl/lib:/opt/vpl/lib64:/opt/ffmpeg-vpl/lib:/usr/local/lib" \
     PATH="/opt/ffmpeg-vpl/bin:/app/application/backend/.venv/bin:$PATH"
