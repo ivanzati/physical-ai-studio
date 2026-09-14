@@ -382,6 +382,10 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 RUN echo "deb [arch=amd64 trusted=yes] https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64 /" \
         > /etc/apt/sources.list.d/nvidia-cuda.list \
+    && apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/cuda-keyring_1.1-1_all.deb -o /tmp/cuda-keyring.deb \
+    && dpkg -i /tmp/cuda-keyring.deb \
+    && rm -f /tmp/cuda-keyring.deb \
     && apt-get update && apt-get install -y --no-install-recommends \
         cuda-cudart-12-8=12.8.90-1 \
         libcublas-12-8=12.8.4.1-1 \
