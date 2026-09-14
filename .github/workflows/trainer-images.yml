@@ -128,7 +128,8 @@ jobs:
         env:
           IMAGE: physicalai-trainer-${{ matrix.device }}:test
         run: |
-          DOCKER_BUILDKIT=1 docker build \
+          docker buildx build \
+            --builder default \
             --build-context libs=library \
             --build-context plugin=application/plugin \
             --build-arg GIT_SHA="${GITHUB_SHA}" \
@@ -138,6 +139,7 @@ jobs:
             --build-arg PHYSICALAI_TRAIN_VERSION="${{ steps.build-metadata.outputs.library-version }}" \
             --cache-from type=registry,ref=${{ env.IMAGE_REGISTRY }}/physicalai-trainer-${{ matrix.device }}:buildcache \
             --file application/docker/Dockerfile.trainer \
+            --load \
             --platform linux/amd64 \
             --progress=plain \
             --tag "${IMAGE}" \
