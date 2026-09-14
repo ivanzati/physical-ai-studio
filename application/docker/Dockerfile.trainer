@@ -350,7 +350,7 @@ ENV TRAINER_BUILD_REVISION="${GIT_SHA}" \
     TRAINER_DEVICE_TYPE=cuda
 COPY --from=builder-cuda --chown=trainer:trainer /opt/venv /opt/venv
 
-RUN python -c "import av; print('PyAV', av.__version__, av.library_versions)"
+RUN /opt/venv/bin/python -c "import av; print('PyAV', av.__version__, av.library_versions)"
 
 FROM runtime-xpu AS physicalai-trainer-xpu
 ARG GIT_SHA=unknown
@@ -375,4 +375,4 @@ ENV TRAINER_BUILD_REVISION="${GIT_SHA}" \
     TRAINER_DEVICE_TYPE=xpu
 COPY --from=builder-xpu --chown=trainer:trainer /opt/venv /opt/venv
 
-RUN python -c "import av; print('PyAV', av.__version__, av.library_versions)"
+RUN /opt/venv/bin/python -c "import av; print('PyAV', av.__version__, av.library_versions)"
