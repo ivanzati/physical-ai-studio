@@ -13,6 +13,9 @@ on:
 
 permissions: {}
 
+env:
+  PUBLIC_ENABLE_COMPILE_MODEL: ${{ vars.PUBLIC_ENABLE_COMPILE_MODEL || 'false' }}
+
 concurrency:
   group: trainer-images-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -132,7 +135,7 @@ jobs:
           build-contexts: |
             libs=library
             plugin=application/plugin
-          target: physicalai-trainer-${{ matrix.device }}
+          target: ${{ env.PUBLIC_ENABLE_COMPILE_MODEL == 'true' && format('physicalai-trainer-{0}', matrix.device) || format('physicalai-trainer-{0}-redistributable', matrix.device) }}
           platforms: linux/amd64
           load: true
           push: false
@@ -262,7 +265,7 @@ jobs:
           build-contexts: |
             libs=library
             plugin=application/plugin
-          target: physicalai-trainer-${{ matrix.device }}
+          target: ${{ env.PUBLIC_ENABLE_COMPILE_MODEL == 'true' && format('physicalai-trainer-{0}', matrix.device) || format('physicalai-trainer-{0}-redistributable', matrix.device) }}
           platforms: linux/amd64
           push: true
           tags: |
