@@ -138,6 +138,7 @@ jobs:
           # Fork PRs cannot write packages to the upstream org, so disable
           # cache export to avoid 403 errors from GHCR.
           cache-write: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          cache-compression: fast  # Use faster compression instead of zstd
 
       - name: Smoke-test docker image
         if: matrix.device != 'cuda' || (github.repository_owner == 'open-edge-platform' && github.event.pull_request.head.repo.full_name == github.repository)
