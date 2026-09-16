@@ -50,7 +50,7 @@ runs:
   using: composite
   steps:
     - name: Cleanup runner
-      uses: open-edge-platform/geti-ci/actions/cleanup-runner@7e686c1248b3939f8ee8e04e2612da727e379d91
+      uses: open-edge-platform/geti-ci/actions/cleanup-runner@6f29a1ff715a9770e024317f30db57bdc0e16418 # cleanup-runner/v0.1.0
       with:
         type: all
 
@@ -65,7 +65,6 @@ runs:
         file: application/docker/Dockerfile
         build-contexts: |
           libs=library
-          plugin=application/plugin
         target: ${{ inputs.enable-compile-model == 'true' && format('physical-ai-studio-{0}', inputs.device) || format('physical-ai-studio-{0}-redistributable', inputs.device) }}
         platforms: linux/amd64
         push: ${{ inputs.push }}

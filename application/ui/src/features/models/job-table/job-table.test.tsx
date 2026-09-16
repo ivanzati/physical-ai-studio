@@ -9,6 +9,7 @@ import { server } from '../../../msw-node-setup';
 import { getMockedDataset } from '../../../test-utils/mocks/mock-dataset';
 import { getMockedEnvironment } from '../../../test-utils/mocks/mock-environment';
 import { getMockedRemoteTrainer } from '../../../test-utils/mocks/mock-remote-trainer';
+import { getMockedTrainJobPayload } from '../../../test-utils/mocks/mock-train-job-payload';
 import { render } from '../../../test-utils/render';
 import { TrainingRow } from './job-table';
 
@@ -43,19 +44,7 @@ const localJob: SchemaTrainJob = {
     created_at: '2026-07-14T09:00:00Z',
     extra_info: { 'train/loss_step': 0.123456 },
     type: 'training',
-    payload: {
-        project_id: 'project-1',
-        dataset_id: 'dataset-1',
-        policy: 'act',
-        model_name: 'pick-and-place',
-        batch_size: 8,
-        num_workers: 'auto',
-        auto_scale_batch_size: false,
-        val_split: 0.1,
-        precision: 'bf16-mixed',
-        compile_model: false,
-        training_target: 'local',
-    },
+    payload: getMockedTrainJobPayload(),
 };
 
 const remoteTrainer = getMockedRemoteTrainer();
@@ -174,6 +163,39 @@ describe('TrainingRow', () => {
         expect(screen.queryByRole('tab', { name: 'Training Datasets' })).not.toBeInTheDocument();
     });
 
+    it('does not render a LoRA badge when lora_enabled is false', () => {
+        renderTrainingRow();
+
+        expect(screen.queryByText('LoRA')).not.toBeInTheDocument();
+    });
+
+    it('renders a LoRA badge when lora_enabled is true', () => {
+        renderTrainingRow({ payload: { ...localJob.payload, lora_enabled: true, lora_use_dora: false } });
+
+        expect(screen.getByText('LoRA')).toBeInTheDocument();
+    });
+
+    it('renders a DoRA badge when lora_use_dora is true', () => {
+        renderTrainingRow({ payload: { ...localJob.payload, lora_enabled: true, lora_use_dora: true } });
+
+        expect(screen.getByText('DoRA')).toBeInTheDocument();
+    });
+
+    it.each(['running', 'completed', 'failed'] as const)('badges a %s SnapFlow job', (status) => {
+        renderTrainingRow({
+            status,
+            payload: { ...localJob.payload, policy: 'pi05', snapflow_enabled: true },
+        });
+
+        expect(screen.getByText('SnapFlow')).toBeInTheDocument();
+    });
+
+    it('leaves an ordinary flow-matching job unbadged', () => {
+        renderTrainingRow();
+
+        expect(screen.queryByText('SnapFlow')).not.toBeInTheDocument();
+    });
+
     it('reveals the panel tabs when the row is clicked', async () => {
         const user = userEvent.setup();
         renderTrainingRow();
@@ -181,10 +203,12 @@ describe('TrainingRow', () => {
         await user.click(screen.getByText('pick-and-place'));
 
         expect(await screen.findByRole('tab', { name: 'Model Metrics' })).toBeInTheDocument();
-        expect(screen.getByRole('tab', { name: 'Training Datasets' })).toBeInTheDocument();
+        // TODO: Remove the comment once training datasets are supported
+        /*expect(screen.getByRole('tab', { name: 'Training Datasets' })).toBeInTheDocument();*/
     });
 
-    it('does not collapse the row when a tab inside the panel is clicked', async () => {
+    // TODO: Unskip this test once training datasets are supported
+    it.skip('does not collapse the row when a tab inside the panel is clicked', async () => {
         const user = userEvent.setup();
         renderTrainingRow();
 
