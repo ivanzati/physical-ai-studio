@@ -98,6 +98,7 @@ jobs:
     needs: check-paths
     if: needs.check-paths.outputs.run_workflow == 'true'
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120 # To check CUDA builds
     permissions:
       contents: read # Checkout code
       packages: write # Push/pull registry build cache on GHCR
