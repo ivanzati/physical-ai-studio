@@ -19,7 +19,7 @@
 # The vision tower (SigLIP backbone) is still left frozen by default.
 #
 # Usage:
-#   physicalai fit --config configs/physicalai/pi05_lora.yaml
+#   physicalai fit --config configs/physicalai/pi05/aloha/lora.yaml
 
 model:
   class_path: physicalai.policies.Pi05
@@ -72,7 +72,6 @@ model:
 
     # Scheduler: full-fine-tune values, auto-scaled by lora_lr_scale above.
     scheduler_warmup_steps: 1000
-    scheduler_decay_steps: null # auto determine
     scheduler_decay_lr: 2.5e-6
 
     # SnapFlow self-distillation (arxiv.org/abs/2604.05656)

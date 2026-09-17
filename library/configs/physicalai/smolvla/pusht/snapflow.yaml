@@ -7,11 +7,11 @@
 # Two-phase recipe (two explicit CLI runs):
 #
 #   # Phase 1 — standard flow-matching training
-#   physicalai fit --config configs/physicalai/smolvla.yaml
+#   physicalai fit --config configs/physicalai/smolvla/pusht/default.yaml
 #
 #   # Phase 2 — SnapFlow distillation, VLM frozen, weights-only warm start
 #   physicalai fit \
-#       --config configs/physicalai/smolvla_snapflow_distillation.yaml \
+#       --config configs/physicalai/smolvla/pusht/snapflow.yaml \
 #       --weights_from ./experiments/lightning_logs/version_0/checkpoints/last.ckpt
 #
 # `--weights_from` loads only the phase-1 state_dict and then re-applies this
@@ -29,9 +29,10 @@
 # its own earlier checkpoint).
 #
 # Single-run alternative (recommended):
-#   Add SnapFlowPhaseCallback to smolvla.yaml trainer.callbacks with a
+#   Add SnapFlowPhaseCallback to trainer.callbacks in
+#   configs/physicalai/smolvla/pusht/default.yaml with a
 #   start_epoch (or start_step) boundary and run a single `physicalai fit`.
-#   See configs/physicalai/pi05_finetune_and_snapflow_distillation.yaml for a
+#   See configs/physicalai/pi05/so101/snapflow.yaml for a
 #   worked example.
 #
 # See docs/how-to/training/snapflow_distillation.md.
