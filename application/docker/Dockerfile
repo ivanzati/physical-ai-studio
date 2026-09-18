@@ -302,12 +302,12 @@ RUN uv pip uninstall --python .venv/bin/python \
 FROM builder-cuda AS builder-cuda-redistributable
 RUN set -eu; \
     CLEANUP_ROOT="$(.venv/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"; \
-    find "$CLEANUP_ROOT" -type d -path "*/triton/backends/amd" \
-        -exec rm -rf {} + 2>/dev/null || true; \
-    find "$CLEANUP_ROOT" -type f \( \
-        -path "*/triton/backends/nvidia/bin/cuobjdump" -o \
-        -path "*/triton/backends/nvidia/bin/nvdisasm" \) \
-        -delete 2>/dev/null || true
+    find "$CLEANUP_ROOT" -type d \( \
+        -path "*/triton/backends/amd" -o \
+        -path "*/triton/backends/nvidia" -o \
+        -path "*/nvidia/cuda_cupti" -o \
+        -path "*/nvidia/cudnn/include" \) \
+        -exec rm -rf {} + 2>/dev/null || true
 
 # ===========================================================================
 # Stage 4d: Robot assets builder
