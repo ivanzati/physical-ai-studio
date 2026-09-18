@@ -253,6 +253,12 @@ RUN uv pip uninstall --python .venv/bin/python \
     pytest-rerunfailures \
     expecttest hypothesis sortedcontainers kgb parameterized
 
+FROM builder-cpu AS builder-cpu-redistributable
+RUN set -eu; \
+    CLEANUP_ROOT="$(.venv/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"; \
+    find "$CLEANUP_ROOT" -type d \( -path "*/triton/backends/nvidia" -o -path "*/triton/backends/amd" \) \
+        -exec rm -rf {} + 2>/dev/null || true
+
 # ===========================================================================
 # Stage 4b: XPU builder
 # ===========================================================================
@@ -270,6 +276,12 @@ RUN uv pip uninstall --python .venv/bin/python \
     pytest-rerunfailures \
     expecttest hypothesis sortedcontainers kgb parameterized
 
+FROM builder-xpu AS builder-xpu-redistributable
+RUN set -eu; \
+    CLEANUP_ROOT="$(.venv/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"; \
+    find "$CLEANUP_ROOT" -type d \( -path "*/triton/backends/nvidia" -o -path "*/triton/backends/amd" \) \
+        -exec rm -rf {} + 2>/dev/null || true
+
 # ===========================================================================
 # Stage 4c: CUDA builder
 # ===========================================================================
@@ -286,6 +298,16 @@ RUN uv pip uninstall --python .venv/bin/python \
     pytest-json-report pytest-metadata \
     pytest-rerunfailures \
     expecttest hypothesis sortedcontainers kgb parameterized
+
+FROM builder-cuda AS builder-cuda-redistributable
+RUN set -eu; \
+    CLEANUP_ROOT="$(.venv/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"; \
+    find "$CLEANUP_ROOT" -type d -path "*/triton/backends/amd" \
+        -exec rm -rf {} + 2>/dev/null || true; \
+    find "$CLEANUP_ROOT" -type f \( \
+        -path "*/triton/backends/nvidia/bin/cuobjdump" -o \
+        -path "*/triton/backends/nvidia/bin/nvdisasm" \) \
+        -delete 2>/dev/null || true
 
 # ===========================================================================
 # Stage 4d: Robot assets builder
@@ -535,44 +557,68 @@ WORKDIR /app/application/backend
 USER appuser
 CMD ["./run.sh"]
 
-# Dedicated redistributable targets. The original targets above intentionally
-# retain the complete dependency and CUDA toolkit contents.
-FROM physical-ai-studio-cpu AS physical-ai-studio-cpu-redistributable
-USER root
-RUN set -eu; \
-    CLEANUP_ROOT="$(/app/application/backend/.venv/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"; \
-    find "$CLEANUP_ROOT" -type d \( -path "*/triton/backends/nvidia" -o -path "*/triton/backends/amd" \) \
-        -exec rm -rf {} + 2>/dev/null || true
+FROM runtime-base AS physical-ai-studio-cpu-redistributable
+ARG GIT_SHA=unknown
+LABEL org.opencontainers.image.source="https://github.com/open-edge-platform/physical-ai-studio" \
+      org.opencontainers.image.description="Physical AI Studio is an end-to-end framework for teaching robots to perform tasks through imitation learning from human demonstrations" \
+      org.opencontainers.image.revision="${GIT_SHA}"
+ARG APP_UID=1000
+ARG APP_GID=1000
+COPY --link --from=builder-cpu-redistributable --chown=${APP_UID}:${APP_GID} \
+    /app/application/backend/.venv /app/application/backend/.venv
+COPY --link --from=app-source --chown=${APP_UID}:${APP_GID} /app /app
+COPY --link --from=robot-assets --chown=${APP_UID}:${APP_GID} \
+    /app/application/backend/src/static/robot-assets /app/application/backend/src/static/robot-assets
+RUN uv pip install --python /app/application/backend/.venv/bin/python --no-deps /app/application/backend
+RUN --mount=type=bind,from=ffmpeg-builder,source=/dist,target=/dist,ro \
+    uv pip install --python /app/application/backend/.venv/bin/python \
+        --no-deps --force-reinstall /dist/av-*.whl \
+    && /app/application/backend/.venv/bin/python -c \
+        "import av; print('PyAV', av.__version__, av.library_versions)"
+WORKDIR /app/application/backend
 USER appuser
+CMD ["./run.sh"]
 
-FROM physical-ai-studio-xpu AS physical-ai-studio-xpu-redistributable
-USER root
-RUN set -eu; \
-    CLEANUP_ROOT="$(/app/application/backend/.venv/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"; \
-    find "$CLEANUP_ROOT" -type d \( -path "*/triton/backends/nvidia" -o -path "*/triton/backends/amd" \) \
-        -exec rm -rf {} + 2>/dev/null || true
+FROM runtime-xpu AS physical-ai-studio-xpu-redistributable
+ARG GIT_SHA=unknown
+LABEL org.opencontainers.image.source="https://github.com/open-edge-platform/physical-ai-studio" \
+      org.opencontainers.image.description="Physical AI Studio is an end-to-end framework for teaching robots to perform tasks through imitation learning from human demonstrations" \
+      org.opencontainers.image.revision="${GIT_SHA}"
+ARG APP_UID=1000
+ARG APP_GID=1000
+COPY --link --from=builder-xpu-redistributable --chown=${APP_UID}:${APP_GID} \
+    /app/application/backend/.venv /app/application/backend/.venv
+COPY --link --from=app-source --chown=${APP_UID}:${APP_GID} /app /app
+COPY --link --from=robot-assets --chown=${APP_UID}:${APP_GID} \
+    /app/application/backend/src/static/robot-assets /app/application/backend/src/static/robot-assets
+RUN uv pip install --python /app/application/backend/.venv/bin/python --no-deps /app/application/backend
+RUN --mount=type=bind,from=ffmpeg-builder,source=/dist,target=/dist,ro \
+    uv pip install --python /app/application/backend/.venv/bin/python \
+        --no-deps --force-reinstall /dist/av-*.whl \
+    && /app/application/backend/.venv/bin/python -c \
+        "import av; print('PyAV', av.__version__, av.library_versions)"
+WORKDIR /app/application/backend
 USER appuser
+CMD ["./run.sh"]
 
-FROM physical-ai-studio-cuda AS physical-ai-studio-cuda-redistributable
-USER root
-RUN set -eux; \
-    CLEANUP_ROOT="$(/app/application/backend/.venv/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"; \
-    find "$CLEANUP_ROOT" -type d -path "*/triton/backends/amd" \
-        -exec rm -rf {} + 2>/dev/null || true; \
-    find "$CLEANUP_ROOT" -type f \( \
-        -path "*/triton/backends/nvidia/bin/cuobjdump" -o \
-        -path "*/triton/backends/nvidia/bin/nvdisasm" \) \
-        -delete 2>/dev/null || true; \
-    apt-get remove -y --allow-remove-essential \
-        cuda-compiler-12-8 cuda-cudart-dev-12-8 cuda-nvcc-12-8 \
-        cuda-gdb-12-8 cuda-nsight-12-8 cuda-nsight-compute-12-8 \
-        cuda-nsight-systems-12-8 || true; \
-    find /usr/local/cuda* /usr/lib/x86_64-linux-gnu/ \
-        \( -path '*/include' -o -path '*/headers' \) -type d \
-        -exec rm -rf {} + 2>/dev/null || true; \
-    find /usr/local/cuda* -name '*.a' -delete 2>/dev/null || true; \
-    rm -rf /usr/local/cuda*/doc /usr/local/cuda*/samples \
-           /usr/local/cuda*/extras/demo_suite /usr/local/cuda*/extras/CUPTI; \
-    find /usr/lib/x86_64-linux-gnu/ -name 'libcusolverMg*' -delete 2>/dev/null || true; \
-    apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+FROM runtime-cuda AS physical-ai-studio-cuda-redistributable
+ARG GIT_SHA=unknown
+LABEL org.opencontainers.image.source="https://github.com/open-edge-platform/physical-ai-studio" \
+      org.opencontainers.image.description="Physical AI Studio is an end-to-end framework for teaching robots to perform tasks through imitation learning from human demonstrations" \
+      org.opencontainers.image.revision="${GIT_SHA}"
+ARG APP_UID=1000
+ARG APP_GID=1000
+COPY --link --from=builder-cuda-redistributable --chown=${APP_UID}:${APP_GID} \
+    /app/application/backend/.venv /app/application/backend/.venv
+COPY --link --from=app-source --chown=${APP_UID}:${APP_GID} /app /app
+COPY --link --from=robot-assets --chown=${APP_UID}:${APP_GID} \
+    /app/application/backend/src/static/robot-assets /app/application/backend/src/static/robot-assets
+RUN uv pip install --python /app/application/backend/.venv/bin/python --no-deps /app/application/backend
+RUN --mount=type=bind,from=ffmpeg-builder,source=/dist,target=/dist,ro \
+    uv pip install --python /app/application/backend/.venv/bin/python \
+        --no-deps --force-reinstall /dist/av-*.whl \
+    && /app/application/backend/.venv/bin/python -c \
+        "import av; print('PyAV', av.__version__, av.library_versions)"
+WORKDIR /app/application/backend
 USER appuser
+CMD ["./run.sh"]
