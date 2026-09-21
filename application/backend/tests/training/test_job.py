@@ -432,6 +432,7 @@ class TestRunTrainingJob:
 
         _reencode_snapshot_video_for_training(video_path)
 
+        assert calls[0][calls[0].index("-c:v") + 1] == "libopenh264"
         assert calls[0][-1] == str(tmp_path / "file-000.transcoding.mp4")
         assert video_path.read_bytes() == b"new"
 

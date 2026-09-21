@@ -72,7 +72,7 @@ EXPORTS_DIRNAME = "exports"
 _DATASET_REPO_ID = "snapshot"
 """Placeholder repo id: datasets are always loaded from a local root here."""
 
-_TRAINING_REENCODED_VIDEO_CODEC = "h264"
+_TRAINING_REENCODED_VIDEO_CODEC = "libopenh264"
 _TRAINING_UNSUPPORTED_VIDEO_CODECS = frozenset({"av1"})
 
 PRETRAINED_BASE_CHECKPOINTS: dict[str, str] = {
