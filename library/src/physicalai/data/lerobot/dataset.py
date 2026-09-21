@@ -137,19 +137,52 @@ class _LeRobotDatasetAdapter(Dataset):
             video_backend=video_backend,
         )
 
+    def _repair_corrupt_videos_for_index(self, idx: int) -> None:
+        from .utils.video_repair import find_videos_with_corrupt_frame, repair_corrupt_video
+
+        corrupt_videos = find_videos_with_corrupt_frame(self._lerobot_dataset, idx)
+        for video_path in corrupt_videos:
+            logger.warning("Repairing corrupt training video %s for sample %s", video_path, idx)
+            repair_corrupt_video(video_path)
+
     def _retry_with_fallback_backend(self, idx: int, exc: Exception) -> Observation:
-        fallback_backend = _DECODE_BACKEND_FALLBACKS.get(self._video_backend)
+        original_backend = self._video_backend
+        fallback_backend = _DECODE_BACKEND_FALLBACKS.get(original_backend)
         if fallback_backend is None or not hasattr(self, "_lerobot_kwargs"):
             raise exc
 
         logger.warning(
             "Video decode failed with backend %r; retrying sample %s with %r",
-            self._video_backend,
+            original_backend,
             idx,
             fallback_backend,
         )
         fallback_dataset = self._build_lerobot_dataset(fallback_backend)
-        observation = FormatConverter.to_observation(fallback_dataset[idx])
+        try:
+            observation = FormatConverter.to_observation(fallback_dataset[idx])
+        except Exception as fallback_exc:
+            if not _is_video_decode_error(fallback_exc):
+                raise
+            logger.warning(
+                "Video decode still failed for sample %s after backend fallback; attempting targeted repair",
+                idx,
+                exc_info=True,
+            )
+            self._repair_corrupt_videos_for_index(idx)
+
+            repaired_dataset = self._build_lerobot_dataset(original_backend)
+            repaired_backend = original_backend
+            try:
+                observation = FormatConverter.to_observation(repaired_dataset[idx])
+            except Exception:
+                repaired_dataset = self._build_lerobot_dataset(fallback_backend)
+                repaired_backend = fallback_backend
+                observation = FormatConverter.to_observation(repaired_dataset[idx])
+
+            self._lerobot_dataset = repaired_dataset
+            self._video_backend = repaired_backend
+            return observation
+
         self._lerobot_dataset = fallback_dataset
         self._video_backend = fallback_backend
         return observation

@@ -164,6 +164,37 @@ class FakeLeRobotDataset_decode_fallback:
         }
 
 
+class FakeLeRobotDataset_repair_after_fallback:
+    """A mock dataset that succeeds only after targeted repair."""
+
+    init_backends: list[str | None] = []
+    repaired: bool = False
+    failure_message: str = "decodeAVFrame, Could not push packet to decoder: Function not implemented"
+
+    def __init__(self, repo_id=None, episodes=None, **kwargs):
+        self._length = 2
+        self.video_backend = kwargs.get("video_backend")
+        type(self).init_backends.append(self.video_backend)
+
+    def __len__(self) -> int:
+        return self._length
+
+    def __getitem__(self, idx: int) -> dict:
+        if not type(self).repaired:
+            raise RuntimeError(type(self).failure_message)
+        return {
+            "observation.images.wrist": torch.randn(3, 64, 64),
+            "observation.state": torch.randn(8),
+            "action": torch.randn(7),
+            "episode_index": torch.tensor(0),
+            "frame_index": torch.tensor(idx),
+            "index": torch.tensor(idx),
+            "task.instructions": "pusht",
+            "task_index": torch.tensor(0),
+            "timestamp": torch.tensor(float(idx) / 10.0),
+        }
+
+
 @pytest.mark.parametrize(
     "dataset_cls",
     [FakeLeRobotDataset, FakeLeRobotDataset2, FakeLeRobotDataset_no_task_or_image],
@@ -257,6 +288,27 @@ class TestLeRobotActionDataset:
         assert isinstance(observation, Observation)
         assert FakeLeRobotDataset_decode_fallback.init_backends == [initial_backend, fallback_backend]
         assert dataset._video_backend == fallback_backend
+
+    def test_getitem_repairs_and_retries_after_both_backends_fail(self, monkeypatch):
+        FakeLeRobotDataset_repair_after_fallback.init_backends = []
+        FakeLeRobotDataset_repair_after_fallback.repaired = False
+        monkeypatch.setattr(
+            "physicalai.data.lerobot.dataset.LeRobotDataset",
+            FakeLeRobotDataset_repair_after_fallback,
+        )
+
+        dataset = _LeRobotDatasetAdapter(repo_id="any/repo", video_backend="pyav")
+        monkeypatch.setattr(
+            dataset,
+            "_repair_corrupt_videos_for_index",
+            lambda idx: setattr(FakeLeRobotDataset_repair_after_fallback, "repaired", True),
+        )
+
+        observation = dataset[0]
+
+        assert isinstance(observation, Observation)
+        assert FakeLeRobotDataset_repair_after_fallback.init_backends == ["pyav", "torchcodec", "pyav"]
+        assert dataset._video_backend == "pyav"
 
 
 class TestLeRobotActionDatasetFeatures:
