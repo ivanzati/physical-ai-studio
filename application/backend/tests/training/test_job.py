@@ -402,6 +402,7 @@ class TestRunTrainingJob:
         kwargs = datamodule.call_args.kwargs
         assert kwargs["root"] == str(tmp_path / "snapshot")
         assert (kwargs["train_batch_size"], kwargs["num_workers"], kwargs["val_split"]) == (16, 2, 0.25)
+        assert kwargs["video_backend"] == "pyav"
 
     @pytest.mark.parametrize("augment_images", [True, False])
     def test_image_augmentation_is_opt_in(self, tmp_path: Path, augment_images: bool) -> None:
