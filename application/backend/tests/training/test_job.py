@@ -31,7 +31,6 @@ from training.job import (
     PEFT_POLICIES,
     PRETRAINED_BASE_CHECKPOINTS,
     SNAPFLOW_CHECKPOINT_NAME,
-    _normalize_snapshot_videos_for_training,
     _load_policy_from_checkpoint,
     build_policy,
     resolve_checkpoint,
@@ -378,7 +377,6 @@ class TestRunTrainingJob:
 
         with (
             patch("physicalai.data.LeRobotDataModule") as datamodule,
-            patch(f"{JOB}._normalize_snapshot_videos_for_training") as normalize_videos,
             patch(f"{JOB}.build_policy"),
             patch("physicalai.train.trainer.Trainer") as trainer_class,
         ):
@@ -393,29 +391,9 @@ class TestRunTrainingJob:
             )
 
         kwargs = datamodule.call_args.kwargs
-        normalize_videos.assert_called_once_with(tmp_path / "snapshot")
         assert kwargs["root"] == str(tmp_path / "snapshot")
         assert (kwargs["train_batch_size"], kwargs["num_workers"], kwargs["val_split"]) == (16, 0, 0.25)
         assert kwargs["video_backend"] == "pyav"
-
-    def test_normalize_snapshot_videos_only_reencodes_unsupported_codecs(self, tmp_path: Path, monkeypatch) -> None:
-        av1_video = tmp_path / "episode_000001.mp4"
-        av1_video.write_bytes(b"video")
-        h264_video = tmp_path / "episode_000002.mp4"
-        h264_video.write_bytes(b"video")
-        (tmp_path / "notes.txt").write_text("ignore")
-
-        monkeypatch.setattr(
-            f"{JOB}._video_codec_name",
-            lambda path: "av1" if path == av1_video else "h264",
-        )
-        reencode = MagicMock()
-        monkeypatch.setattr(f"{JOB}._reencode_snapshot_video_for_training", reencode)
-
-        normalized = _normalize_snapshot_videos_for_training(tmp_path)
-
-        assert normalized == 1
-        reencode.assert_called_once_with(av1_video)
 
     @pytest.mark.parametrize("augment_images", [True, False])
     def test_image_augmentation_is_opt_in(self, tmp_path: Path, augment_images: bool) -> None:

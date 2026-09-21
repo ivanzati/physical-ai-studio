@@ -34,7 +34,6 @@ import gc
 import logging
 import os
 import shutil
-import subprocess  # nosec B404 - used below with fixed argv, shell=False
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -71,9 +70,6 @@ EXPORTS_DIRNAME = "exports"
 
 _DATASET_REPO_ID = "snapshot"
 """Placeholder repo id: datasets are always loaded from a local root here."""
-
-_TRAINING_REENCODED_VIDEO_CODEC = "h264"
-_TRAINING_UNSUPPORTED_VIDEO_CODECS = frozenset({"av1"})
 
 PRETRAINED_BASE_CHECKPOINTS: dict[str, str] = {
     "molmoact2": "allenai/MolmoAct2",
@@ -390,9 +386,7 @@ def run_training_job(
     with _hf_token_env(spec.run_options.hf_token):
         accelerator = resolve_accelerator(spec.device_type)
         output_dir, cache_dir = Path(output_dir), Path(cache_dir)
-        dataset_root = Path(dataset_root)
         cache_dir.mkdir(parents=True, exist_ok=True)
-        _normalize_snapshot_videos_for_training(dataset_root)
         resolved_num_workers = 0
         if spec.num_workers != 0:
             logger.warning(
@@ -456,62 +450,6 @@ def run_training_job(
         del trainer, datamodule, policy
         _release_memory()
         _export(export_policy, output_dir, report, spec.export_backends)
-
-
-def _video_codec_name(video_path: Path) -> str | None:
-    import av
-
-    with av.open(str(video_path)) as container:
-        for stream in container.streams.video:
-            codec_context = getattr(stream, "codec_context", None)
-            codec_name = getattr(codec_context, "name", None)
-            if codec_name:
-                return str(codec_name).lower()
-    return None
-
-
-def _reencode_snapshot_video_for_training(video_path: Path) -> None:
-    tmp_path = video_path.with_suffix(f"{video_path.suffix}.transcoding")
-    try:
-        subprocess.run(  # noqa: S603  # nosec B603 - fixed ffmpeg argv, shell=False
-            [
-                "ffmpeg",
-                "-nostdin",
-                "-y",
-                "-loglevel",
-                "error",
-                "-i",
-                str(video_path),
-                "-an",
-                "-c:v",
-                _TRAINING_REENCODED_VIDEO_CODEC,
-                "-pix_fmt",
-                "yuv420p",
-                str(tmp_path),
-            ],
-            check=True,
-        )
-        tmp_path.replace(video_path)
-    finally:
-        with contextlib.suppress(FileNotFoundError):
-            tmp_path.unlink()
-
-
-def _normalize_snapshot_videos_for_training(dataset_root: Path) -> int:
-    normalized = 0
-    for video_path in dataset_root.rglob("*.mp4"):
-        codec_name = _video_codec_name(video_path)
-        if codec_name not in _TRAINING_UNSUPPORTED_VIDEO_CODECS:
-            continue
-        logger.warning(
-            "Re-encoding snapshot video %s from unsupported codec %s to %s for training",
-            video_path,
-            codec_name,
-            _TRAINING_REENCODED_VIDEO_CODEC,
-        )
-        _reencode_snapshot_video_for_training(video_path)
-        normalized += 1
-    return normalized
 
 
 def _build_snapflow_callback(spec: TrainingJobSpec) -> Any:
