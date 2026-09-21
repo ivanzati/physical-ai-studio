@@ -509,15 +509,7 @@ def _normalize_snapshot_videos_for_training(dataset_root: Path) -> int:
             codec_name,
             _TRAINING_REENCODED_VIDEO_CODEC,
         )
-        try:
-            _reencode_snapshot_video_for_training(video_path)
-        except (subprocess.CalledProcessError, OSError):
-            logger.warning(
-                "Failed to re-encode snapshot video %s for training; continuing with original file",
-                video_path,
-                exc_info=True,
-            )
-            continue
+        _reencode_snapshot_video_for_training(video_path)
         normalized += 1
     return normalized
 

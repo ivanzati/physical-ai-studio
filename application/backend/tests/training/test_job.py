@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import gc
 import os
-import subprocess
 import weakref
 from pathlib import Path
 from types import SimpleNamespace
@@ -418,20 +417,6 @@ class TestRunTrainingJob:
 
         assert normalized == 1
         reencode.assert_called_once_with(av1_video)
-
-    def test_normalize_snapshot_videos_ignores_reencode_failures(self, tmp_path: Path, monkeypatch) -> None:
-        av1_video = tmp_path / "episode_000001.mp4"
-        av1_video.write_bytes(b"video")
-
-        monkeypatch.setattr(f"{JOB}._video_codec_name", lambda _path: "av1")
-        monkeypatch.setattr(
-            f"{JOB}._reencode_snapshot_video_for_training",
-            MagicMock(side_effect=subprocess.CalledProcessError(69, ["ffmpeg"])),
-        )
-
-        normalized = _normalize_snapshot_videos_for_training(tmp_path)
-
-        assert normalized == 0
 
     def test_reencode_snapshot_video_uses_mp4_temp_output(self, tmp_path: Path, monkeypatch) -> None:
         video_path = tmp_path / "file-000.mp4"
