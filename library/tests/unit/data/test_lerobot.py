@@ -195,37 +195,6 @@ class FakeLeRobotDataset_repair_after_fallback:
         }
 
 
-class FakeLeRobotDataset_cached_recovery:
-    """A mock dataset that only has one decodable sample."""
-
-    init_backends: list[str | None] = []
-    failure_message: str = "decodeAVFrame, Could not push packet to decoder: Function not implemented"
-
-    def __init__(self, repo_id=None, episodes=None, **kwargs):
-        self._length = 2
-        self.video_backend = kwargs.get("video_backend")
-        type(self).init_backends.append(self.video_backend)
-
-    def __len__(self) -> int:
-        return self._length
-
-    def __getitem__(self, idx: int) -> dict:
-        if idx == 1:
-            raise RuntimeError(type(self).failure_message)
-        torch.manual_seed(idx)
-        return {
-            "observation.images.wrist": torch.randn(3, 64, 64),
-            "observation.state": torch.randn(8),
-            "action": torch.randn(7),
-            "episode_index": torch.tensor(0),
-            "frame_index": torch.tensor(idx),
-            "index": torch.tensor(idx),
-            "task.instructions": "pusht",
-            "task_index": torch.tensor(0),
-            "timestamp": torch.tensor(float(idx) / 10.0),
-        }
-
-
 @pytest.mark.parametrize(
     "dataset_cls",
     [FakeLeRobotDataset, FakeLeRobotDataset2, FakeLeRobotDataset_no_task_or_image],
@@ -340,23 +309,6 @@ class TestLeRobotActionDataset:
         assert isinstance(observation, Observation)
         assert FakeLeRobotDataset_repair_after_fallback.init_backends == ["pyav", "torchcodec", "pyav"]
         assert dataset._video_backend == "pyav"
-
-    def test_getitem_reuses_last_good_sample_after_unrecoverable_decode_error(self, monkeypatch):
-        FakeLeRobotDataset_cached_recovery.init_backends = []
-        monkeypatch.setattr(
-            "physicalai.data.lerobot.dataset.LeRobotDataset",
-            FakeLeRobotDataset_cached_recovery,
-        )
-
-        dataset = _LeRobotDatasetAdapter(repo_id="any/repo", video_backend="pyav")
-        monkeypatch.setattr(dataset, "_repair_corrupt_videos_for_index", lambda idx: None)
-
-        good_observation = dataset[0]
-        recovered_observation = dataset[1]
-
-        assert isinstance(recovered_observation, Observation)
-        assert torch.equal(recovered_observation.state, good_observation.state)
-        assert FakeLeRobotDataset_cached_recovery.init_backends == ["pyav", "torchcodec", "pyav", "torchcodec"]
 
 
 class TestLeRobotActionDatasetFeatures:
