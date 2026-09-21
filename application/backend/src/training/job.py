@@ -394,9 +394,6 @@ def run_training_job(
             train_batch_size=spec.batch_size,
             num_workers=spec.num_workers,
             val_split=spec.val_split,
-            # Training runs in environments where the bundled PyAV/FFmpeg stack is
-            # supported, while torchcodec decoding has failed on real datasets.
-            video_backend="pyav",
             # Applied to the train split only; the datamodule leaves validation
             # images untouched so eval loss stays comparable across runs.
             image_transforms=DefaultImageAugmentations() if spec.augment_images else None,
