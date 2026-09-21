@@ -387,24 +387,15 @@ def run_training_job(
         accelerator = resolve_accelerator(spec.device_type)
         output_dir, cache_dir = Path(output_dir), Path(cache_dir)
         cache_dir.mkdir(parents=True, exist_ok=True)
-        resolved_num_workers = 0
-        if spec.num_workers != 0:
-            logger.warning(
-                "Training video decoding with PyAV is not supported in DataLoader workers; forcing num_workers=0 "
-                "(requested %s)",
-                spec.num_workers,
-            )
 
         datamodule = LeRobotDataModule(
             repo_id=_DATASET_REPO_ID,
             root=str(dataset_root),
             train_batch_size=spec.batch_size,
-            num_workers=resolved_num_workers,
+            num_workers=spec.num_workers,
             val_split=spec.val_split,
             # Training runs in environments where the bundled PyAV/FFmpeg stack is
             # supported, while torchcodec decoding has failed on real datasets.
-            # LeRobot's PyAV path is also not worker-safe here, so training keeps
-            # decoding in the main process with num_workers=0 above.
             video_backend="pyav",
             # Applied to the train split only; the datamodule leaves validation
             # images untouched so eval loss stays comparable across runs.
