@@ -133,37 +133,6 @@ class FakeLeRobotDataset_no_task_or_image:
         }
 
 
-class FakeLeRobotDataset_decode_fallback:
-    """A mock dataset that fails on one backend and succeeds on the fallback."""
-
-    init_backends: list[str | None] = []
-    failing_backend: str | None = None
-    failure_message: str = ""
-
-    def __init__(self, repo_id=None, episodes=None, **kwargs):
-        self._length = 2
-        self.video_backend = kwargs.get("video_backend")
-        type(self).init_backends.append(self.video_backend)
-
-    def __len__(self) -> int:
-        return self._length
-
-    def __getitem__(self, idx: int) -> dict:
-        if self.video_backend == type(self).failing_backend:
-            raise RuntimeError(type(self).failure_message)
-        return {
-            "observation.images.wrist": torch.randn(3, 64, 64),
-            "observation.state": torch.randn(8),
-            "action": torch.randn(7),
-            "episode_index": torch.tensor(0),
-            "frame_index": torch.tensor(idx),
-            "index": torch.tensor(idx),
-            "task.instructions": "pusht",
-            "task_index": torch.tensor(0),
-            "timestamp": torch.tensor(float(idx) / 10.0),
-        }
-
-
 @pytest.mark.parametrize(
     "dataset_cls",
     [FakeLeRobotDataset, FakeLeRobotDataset2, FakeLeRobotDataset_no_task_or_image],
@@ -227,36 +196,6 @@ class TestLeRobotActionDataset:
             assert torch.equal(observation.action["continuous"], raw_item["action.continuous"])
         else:
             raise AssertionError("No recognizable action field in mock dataset")
-
-    @pytest.mark.parametrize(
-        ("initial_backend", "fallback_backend", "failure_message"),
-        [
-            ("pyav", "torchcodec", "[Errno 38] Function not implemented: 'avcodec_send_packet()'"),
-            (None, "pyav", "decodeAVFrame, Could not push packet to decoder: Function not implemented"),
-        ],
-    )
-    def test_getitem_retries_with_fallback_backend(
-        self,
-        monkeypatch,
-        initial_backend,
-        fallback_backend,
-        failure_message,
-    ):
-        FakeLeRobotDataset_decode_fallback.init_backends = []
-        FakeLeRobotDataset_decode_fallback.failing_backend = initial_backend
-        FakeLeRobotDataset_decode_fallback.failure_message = failure_message
-        monkeypatch.setattr(
-            "physicalai.data.lerobot.dataset.LeRobotDataset",
-            FakeLeRobotDataset_decode_fallback,
-        )
-
-        dataset = _LeRobotDatasetAdapter(repo_id="any/repo", video_backend=initial_backend)
-
-        observation = dataset[0]
-
-        assert isinstance(observation, Observation)
-        assert FakeLeRobotDataset_decode_fallback.init_backends == [initial_backend, fallback_backend]
-        assert dataset._video_backend == fallback_backend
 
 
 class TestLeRobotActionDatasetFeatures:

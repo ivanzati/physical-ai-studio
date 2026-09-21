@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from lightning_utilities import module_available
@@ -26,27 +25,6 @@ if TYPE_CHECKING or module_available("lerobot"):
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 else:
     LeRobotDataset = None
-
-logger = logging.getLogger(__name__)
-
-_DECODE_BACKEND_FALLBACKS: dict[str | None, str] = {
-    None: "pyav",
-    "pyav": "torchcodec",
-    "torchcodec": "pyav",
-}
-
-
-def _is_video_decode_error(exc: Exception) -> bool:
-    message = str(exc)
-    return any(
-        token in message
-        for token in (
-            "avcodec_send_packet()",
-            "decodeAVFrame",
-            "Could not push packet to decoder",
-            "Function not implemented",
-        )
-    )
 
 
 class _LeRobotDatasetAdapter(Dataset):
@@ -116,43 +94,20 @@ class _LeRobotDatasetAdapter(Dataset):
             msg = "LeRobotDataset is not available. Install lerobot with: uv pip install lerobot."
             raise ImportError(msg)
 
-        self._lerobot_kwargs = {
-            "repo_id": repo_id,
-            "root": root,
-            "episodes": episodes,
-            "image_transforms": image_transforms,
-            "delta_timestamps": delta_timestamps,
-            "tolerance_s": tolerance_s,
-            "revision": revision,
-            "force_cache_sync": force_cache_sync,
-            "download_videos": download_videos,
-            "batch_encoding_size": batch_encoding_size,
-        }
-        self._video_backend = video_backend
-        self._lerobot_dataset = self._build_lerobot_dataset(video_backend)
-
-    def _build_lerobot_dataset(self, video_backend: str | None) -> LeRobotDataset:
-        return LeRobotDataset(
-            **self._lerobot_kwargs,
+        # All arguments are passed
+        self._lerobot_dataset = LeRobotDataset(
+            repo_id=repo_id,
+            root=root,
+            episodes=episodes,
+            image_transforms=image_transforms,
+            delta_timestamps=delta_timestamps,
+            tolerance_s=tolerance_s,
+            revision=revision,
+            force_cache_sync=force_cache_sync,
+            download_videos=download_videos,
             video_backend=video_backend,
+            batch_encoding_size=batch_encoding_size,
         )
-
-    def _retry_with_fallback_backend(self, idx: int, exc: Exception) -> Observation:
-        fallback_backend = _DECODE_BACKEND_FALLBACKS.get(self._video_backend)
-        if fallback_backend is None or not hasattr(self, "_lerobot_kwargs"):
-            raise exc
-
-        logger.warning(
-            "Video decode failed with backend %r; retrying sample %s with %r",
-            self._video_backend,
-            idx,
-            fallback_backend,
-        )
-        fallback_dataset = self._build_lerobot_dataset(fallback_backend)
-        observation = FormatConverter.to_observation(fallback_dataset[idx])
-        self._lerobot_dataset = fallback_dataset
-        self._video_backend = fallback_backend
-        return observation
 
     def __len__(self) -> int:
         """Get the length of the dataset.
@@ -171,12 +126,7 @@ class _LeRobotDatasetAdapter(Dataset):
         Returns:
             Observation: The item from the dataset.
         """
-        try:
-            return FormatConverter.to_observation(self._lerobot_dataset[idx])
-        except Exception as exc:
-            if not _is_video_decode_error(exc):
-                raise
-            return self._retry_with_fallback_backend(idx, exc)
+        return FormatConverter.to_observation(self._lerobot_dataset[idx])
 
     @staticmethod
     def from_lerobot(lerobot_dataset: LeRobotDataset) -> _LeRobotDatasetAdapter:
@@ -194,7 +144,6 @@ class _LeRobotDatasetAdapter(Dataset):
         instance = _LeRobotDatasetAdapter.__new__(_LeRobotDatasetAdapter)
         # Bypassing __init__ to set the internal dataset
         instance._lerobot_dataset = lerobot_dataset  # noqa: SLF001
-        instance._video_backend = None  # noqa: SLF001
         return instance
 
     @property
