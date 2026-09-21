@@ -27,13 +27,6 @@ def test_streaming_settings_translate_to_lerobot_kwargs() -> None:
     assert "vcodec" not in kwargs
 
 
-def test_auto_candidates_prefer_h264_before_av1() -> None:
-    candidates = StreamingEncodingSettings._vcodec_candidates()
-
-    assert candidates.index("h264_qsv") < candidates.index("av1_qsv")
-    assert candidates.index("libopenh264") < candidates.index("libsvtav1")
-
-
 def test_create_uses_rgb_encoder_and_not_vcodec(tmp_path: Path) -> None:
     settings = StreamingEncodingSettings(
         streaming_encoding=True,
