@@ -32,6 +32,7 @@ from training.job import (
     PRETRAINED_BASE_CHECKPOINTS,
     SNAPFLOW_CHECKPOINT_NAME,
     _normalize_snapshot_videos_for_training,
+    _reencode_snapshot_video_for_training,
     _load_policy_from_checkpoint,
     build_policy,
     resolve_checkpoint,
@@ -416,6 +417,23 @@ class TestRunTrainingJob:
 
         assert normalized == 1
         reencode.assert_called_once_with(av1_video)
+
+    def test_reencode_snapshot_video_uses_mp4_temp_output(self, tmp_path: Path, monkeypatch) -> None:
+        video_path = tmp_path / "file-000.mp4"
+        video_path.write_bytes(b"old")
+        calls: list[list[str]] = []
+
+        def fake_run(argv: list[str], check: bool) -> None:
+            assert check is True
+            calls.append(argv)
+            Path(argv[-1]).write_bytes(b"new")
+
+        monkeypatch.setattr(f"{JOB}.subprocess.run", fake_run)
+
+        _reencode_snapshot_video_for_training(video_path)
+
+        assert calls[0][-1] == str(tmp_path / "file-000.transcoding.mp4")
+        assert video_path.read_bytes() == b"new"
 
     @pytest.mark.parametrize("augment_images", [True, False])
     def test_image_augmentation_is_opt_in(self, tmp_path: Path, augment_images: bool) -> None:

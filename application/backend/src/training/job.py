@@ -468,7 +468,7 @@ def _video_codec_name(video_path: Path) -> str | None:
 
 
 def _reencode_snapshot_video_for_training(video_path: Path) -> None:
-    tmp_path = video_path.with_suffix(f"{video_path.suffix}.transcoding")
+    tmp_path = video_path.with_name(f"{video_path.stem}.transcoding{video_path.suffix}")
     try:
         subprocess.run(  # noqa: S603  # nosec B603 - fixed ffmpeg argv, shell=False
             [
