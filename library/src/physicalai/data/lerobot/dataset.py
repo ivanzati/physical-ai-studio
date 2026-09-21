@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 from typing import TYPE_CHECKING
 
@@ -129,6 +130,7 @@ class _LeRobotDatasetAdapter(Dataset):
             "batch_encoding_size": batch_encoding_size,
         }
         self._video_backend = video_backend
+        self._last_good_observation: Observation | None = None
         self._lerobot_dataset = self._build_lerobot_dataset(video_backend)
 
     def _build_lerobot_dataset(self, video_backend: str | None) -> LeRobotDataset:
@@ -205,11 +207,24 @@ class _LeRobotDatasetAdapter(Dataset):
             Observation: The item from the dataset.
         """
         try:
-            return FormatConverter.to_observation(self._lerobot_dataset[idx])
+            observation = FormatConverter.to_observation(self._lerobot_dataset[idx])
         except Exception as exc:
             if not _is_video_decode_error(exc):
                 raise
-            return self._retry_with_fallback_backend(idx, exc)
+            try:
+                observation = self._retry_with_fallback_backend(idx, exc)
+            except Exception as retry_exc:
+                if not _is_video_decode_error(retry_exc) or self._last_good_observation is None:
+                    raise
+                logger.warning(
+                    "Video decode still failed for sample %s after fallback/repair; reusing the last good sample",
+                    idx,
+                    exc_info=True,
+                )
+                return copy.deepcopy(self._last_good_observation)
+
+        self._last_good_observation = observation
+        return observation
 
     @staticmethod
     def from_lerobot(lerobot_dataset: LeRobotDataset) -> _LeRobotDatasetAdapter:
@@ -228,6 +243,7 @@ class _LeRobotDatasetAdapter(Dataset):
         # Bypassing __init__ to set the internal dataset
         instance._lerobot_dataset = lerobot_dataset  # noqa: SLF001
         instance._video_backend = None  # noqa: SLF001
+        instance._last_good_observation = None  # noqa: SLF001
         return instance
 
     @property
