@@ -41,6 +41,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libva-dev \
         libnuma-dev \
         libvpx-dev \
+        libdav1d-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Python packaging tools for building the PyAV wheel.
@@ -91,7 +92,9 @@ RUN git init svtav1 \
 
 # FFmpeg — LGPL build: no --enable-gpl and no --enable-nonfree. Every enabled
 # external library (libvpl/MIT, libvpx/BSD, libopenh264/BSD, libsvtav1/BSD,
-# vaapi/MIT) is LGPL-compatible.
+# libdav1d/BSD, vaapi/MIT) is LGPL-compatible. libdav1d is the software AV1
+# decoder — FFmpeg's built-in av1 decoder is hwaccel-only and cannot decode
+# AV1 in software, which the training data loader requires.
 RUN git init ffmpeg \
     && git -C ffmpeg remote add origin https://github.com/FFmpeg/FFmpeg.git \
     && git -C ffmpeg fetch --depth 1 origin "${FFMPEG_REF}" \
@@ -110,14 +113,16 @@ RUN ./configure \
         --enable-libsvtav1 \
         --enable-libopenh264 \
         --enable-libvpx \
+        --enable-libdav1d \
     && make -j"$(nproc)" \
     && make install \
     && ldconfig
 
-# Fail the build early if QSV encoders did not get wired in.
+# Fail the build early if QSV encoders or the software AV1 decoder are missing.
 RUN ffmpeg -version \
     && ffmpeg -hide_banner -encoders | grep qsv \
-    && ffmpeg -hide_banner -h encoder=h264_qsv > /dev/null
+    && ffmpeg -hide_banner -h encoder=h264_qsv > /dev/null \
+    && ffmpeg -hide_banner -decoders | grep libdav1d
 
 # Compile the PyAV wheel from source against the custom FFmpeg.
 WORKDIR /build
@@ -247,6 +252,7 @@ RUN groupadd --gid "${TRAINER_GID}" trainer \
         libva-drm2 \
         libvpx9 \
         libnuma1 \
+        libdav1d7 \
     && rm -rf /var/lib/apt/lists/* \
     && python -m pip uninstall -y pip setuptools \
     && mkdir -p /var/lib/physicalai-trainer \
