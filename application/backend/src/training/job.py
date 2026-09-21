@@ -76,12 +76,15 @@ _TRAINING_REENCODED_VIDEO_CODEC = "libopenh264"
 _TRAINING_UNSUPPORTED_VIDEO_CODECS = frozenset({"av1"})
 
 PRETRAINED_BASE_CHECKPOINTS: dict[str, str] = {
+    "molmoact2": "allenai/MolmoAct2",
     "pi05": "lerobot/pi05_base",
+    "rldx1": "RLWRLD/RLDX-1-PT",
     "smolvla": "lerobot/smolvla_base",
+    "xr0": "XiaomiRobotics/Xiaomi-Robotics-0-Pretrain",
 }
 """Hub checkpoints used to initialize policies that only fine-tune from pretrained weights."""
 
-PEFT_POLICIES = frozenset({"pi05"})
+PEFT_POLICIES = frozenset({"pi05", "molmoact2"})
 """Policies whose ``Config`` mixes in ``physicalai.policies.mixins.peft.PeftConfigMixin`` and
 support LoRA/DoRA fine-tuning."""
 
@@ -110,7 +113,7 @@ class TrainingJobSpec(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    policy: str = Field(description="Policy name, e.g. 'act', 'pi05', or 'smolvla'.")
+    policy: str = Field(description="Policy name, e.g. 'act', 'pi05', 'molmoact2', or 'smolvla'.")
     policy_source: Literal["physicalai", "lerobot"] = Field(
         default="physicalai",
         description="Which implementation of the policy to train.",
