@@ -175,6 +175,14 @@ RUN uv pip uninstall --python /opt/venv/bin/python \
     pytest-rerunfailures \
     expecttest hypothesis sortedcontainers kgb parameterized
 
+# cuobjdump/nvdisasm are CUDA disassembly/debug tools bundled by Triton's
+# nvidia backend. NVIDIA's EULA does not permit redistributing them, and
+# unlike ptxas they are not needed to JIT-compile or run Triton kernels.
+RUN find /opt/venv -type f \( \
+        -path "*/triton/backends/nvidia/bin/cuobjdump" -o \
+        -path "*/triton/backends/nvidia/bin/nvdisasm" \) \
+    -delete
+
 # Replace PyAV with the wheel built against the custom LGPL FFmpeg. The venv is
 # copied wholesale into the runtime image, which has no uv/pip, so swap here.
 RUN --mount=type=bind,from=ffmpeg-builder,source=/dist,target=/dist,ro \

@@ -304,6 +304,14 @@ RUN uv pip uninstall --python .venv/bin/python \
     pytest-rerunfailures \
     expecttest hypothesis sortedcontainers kgb parameterized
 
+# cuobjdump/nvdisasm are CUDA disassembly/debug tools bundled by Triton's
+# nvidia backend. NVIDIA's EULA does not permit redistributing them, and
+# unlike ptxas they are not needed to JIT-compile or run Triton kernels.
+RUN find .venv -type f \( \
+        -path "*/triton/backends/nvidia/bin/cuobjdump" -o \
+        -path "*/triton/backends/nvidia/bin/nvdisasm" \) \
+    -delete
+
 FROM builder-cuda AS builder-cuda-redistributable
 RUN set -eu; \
     CLEANUP_ROOT="$(.venv/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"; \
