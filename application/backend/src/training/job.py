@@ -72,15 +72,15 @@ _DATASET_REPO_ID = "snapshot"
 """Placeholder repo id: datasets are always loaded from a local root here."""
 
 PRETRAINED_BASE_CHECKPOINTS: dict[str, str] = {
+    "molmoact2": "allenai/MolmoAct2",
     "pi05": "lerobot/pi05_base",
+    "rldx1": "RLWRLD/RLDX-1-PT",
     "smolvla": "lerobot/smolvla_base",
+    "xr0": "XiaomiRobotics/Xiaomi-Robotics-0-Pretrain",
 }
 """Hub checkpoints used to initialize policies that only fine-tune from pretrained weights."""
 
-_WEIGHTS_ONLY_RESUME_POLICIES = frozenset({"pi0"})
-"""Policies whose checkpoints must be reloaded with ``weights_only=True``."""
-
-PEFT_POLICIES = frozenset({"pi05", "pi0"})
+PEFT_POLICIES = frozenset({"pi05", "molmoact2"})
 """Policies whose ``Config`` mixes in ``physicalai.policies.mixins.peft.PeftConfigMixin`` and
 support LoRA/DoRA fine-tuning."""
 
@@ -109,7 +109,7 @@ class TrainingJobSpec(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    policy: str = Field(description="Policy name, e.g. 'act', 'pi0', 'pi05', 'smolvla', 'groot'.")
+    policy: str = Field(description="Policy name, e.g. 'act', 'pi05', 'molmoact2', or 'smolvla'.")
     policy_source: Literal["physicalai", "lerobot"] = Field(
         default="physicalai",
         description="Which implementation of the policy to train.",
@@ -473,10 +473,7 @@ def _load_policy_from_checkpoint(spec: TrainingJobSpec, checkpoint: Path) -> Pol
         from physicalai.policies import get_physicalai_policy_class
 
         policy_class = get_physicalai_policy_class(spec.policy)
-        # Some policies store non-tensor objects Lightning cannot unpickle
-        # safely by default; those are loaded weights-only.
-        kwargs: dict[str, Any] = {"weights_only": True} if spec.policy.lower() in _WEIGHTS_ONLY_RESUME_POLICIES else {}
-        policy = policy_class.load_from_checkpoint(str(checkpoint), **kwargs)
+        policy = policy_class.load_from_checkpoint(str(checkpoint))
 
     if spec.compile_model:
         import torch
