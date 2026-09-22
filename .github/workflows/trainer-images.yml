@@ -92,6 +92,7 @@ jobs:
             ghcr.io:443
             ghcr1production.blob.core.windows.net:443
             github.com:443
+            gitlab.com:443
             keyserver.ubuntu.com:443
             pkg-containers.githubusercontent.com:443
             ppa.launchpadcontent.net:443
@@ -186,7 +187,8 @@ jobs:
   publish:
     name: Publish, attest, scan, and sign (${{ matrix.device }})
     needs: [check-paths, build-and-smoke-test]
-    if: github.ref == 'refs/heads/main' && needs.check-paths.outputs.run_workflow == 'true'
+    # TODO: Allow to publish from branches other than main for the test workflow
+    # if: github.ref == 'refs/heads/main' && needs.check-paths.outputs.run_workflow == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -215,6 +217,7 @@ jobs:
             ghcr.io:443
             ghcr1production.blob.core.windows.net:443
             github.com:443
+            gitlab.com:443
             keyserver.ubuntu.com:443
             mirror.gcr.io:443
             pkg-containers.githubusercontent.com:443
