@@ -187,8 +187,7 @@ jobs:
   publish:
     name: Publish, attest, scan, and sign (${{ matrix.device }})
     needs: [check-paths, build-and-smoke-test]
-    # TODO: Allow to publish from branches other than main for the test workflow
-    # if: github.ref == 'refs/heads/main' && needs.check-paths.outputs.run_workflow == 'true'
+    if: github.ref == 'refs/heads/main' && needs.check-paths.outputs.run_workflow == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
