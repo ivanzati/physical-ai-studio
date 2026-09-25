@@ -238,7 +238,7 @@ jobs:
           artifact-name: "trivy-scan-diff-${{ matrix.image }}"
           ignore_unfixed: true
 
-  dast-scan:
+  studio-dast-scan:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
@@ -320,7 +320,7 @@ jobs:
               exit 1
           fi
 
-          echo "CONTAINER_NAME=${CONTAINER_NAME}" >> $GITHUB_ENV
+          echo "CONTAINER_NAME=${CONTAINER_NAME}" >> "$GITHUB_ENV"
 
       - name: Run ZAP API Scan
         uses: zaproxy/action-api-scan@5158fe4d9d8fcc75ea204db81317cce7f9e5453d # v0.10.0
@@ -396,7 +396,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: read
+    strategy:
+      matrix:
+        ai-device: [xpu]
     steps:
       - name: Harden the runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
@@ -437,18 +439,20 @@ jobs:
 
       - name: Pull trainer container image
         env:
+          DEVICE: ${{ matrix.ai-device }}
           OWNER: ${{ github.repository_owner }}
         run: |
-          IMAGE_NAME="ghcr.io/${OWNER}/physicalai-trainer-xpu:main"
+          IMAGE_NAME="ghcr.io/${OWNER}/physicalai-trainer-${DEVICE}:main"
           echo "Pulling image: $IMAGE_NAME"
           docker pull "$IMAGE_NAME"
 
       - name: Run trainer container image
         env:
+          DEVICE: ${{ matrix.ai-device }}
           OWNER: ${{ github.repository_owner }}
         run: |
-          CONTAINER_NAME="physicalai-trainer-xpu"
-          IMAGE_NAME="ghcr.io/${OWNER}/physicalai-trainer-xpu:main"
+          CONTAINER_NAME="physicalai-trainer-${DEVICE}"
+          IMAGE_NAME="ghcr.io/${OWNER}/physicalai-trainer-${DEVICE}:main"
 
           docker run -d \
             --name "$CONTAINER_NAME" \
@@ -482,7 +486,7 @@ jobs:
           format: "openapi"
           allow_issue_writing: false
           fail_action: false
-          artifact_name: zapapi-trainer-xpu
+          artifact_name: zapapi-trainer
 
       - name: Run Schemathesis Scan
         uses: schemathesis/action@806cace2053cbbac93188e1281ff7da415643160 # v3
@@ -500,7 +504,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
-          name: schemathesis-trainer-report-xpu
+          name: schemathesis-trainer-report
           path: schemathesis-trainer-report/junit.xml
 
       - name: Re-check trainer health after testing
@@ -531,7 +535,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
-          name: trainer-container-logs-xpu
+          name: trainer-container-logs
           path: trainer-dast-scan-logs/
 
       - name: Stop and clean up trainer container
